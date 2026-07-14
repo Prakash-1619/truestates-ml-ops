@@ -24,7 +24,7 @@ def run(config: dict):
 
         t0 = time.time()
         import micro_data_preparation_yaml as ingestion_module
-        result = ingestion_module.run_ingestion(config)
+        result = ingestion_module.run_ingestion() #config
         duration = time.time() - t0
 
         out_path = os.path.join(config["paths"]["base_dir"], config["paths"]["ingestion_output"])
