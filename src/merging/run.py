@@ -26,7 +26,7 @@ def run(config: dict):
 
         t0 = time.time()
         import transactions_data_preparation_mode_parquet_yaml as merging_module
-        result = merging_module.run_merging_pipeline(config)
+        result = merging_module.run_merging_pipeline() #config
         duration = time.time() - t0
 
         out_path = os.path.join(config["paths"]["base_dir"], config["paths"]["merging_output"])
