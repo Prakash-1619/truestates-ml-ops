@@ -50,7 +50,7 @@ pip install -r requirements.txt
 # --- DVC remote pointing at DagsHub's S3-compatible bucket storage ---
 dvc init
 dvc remote add origin s3://truestates-ml-ops -d
-dvc remote modify origin endpointurl https://dagshub.com/AnanthS/truestates-ml-ops.s3
+dvc remote modify origin endpointurl https://dagshub.com/poojariprakash88/truestates-ml-ops.s3
 dvc remote modify origin --local access_key_id     <your_dagshub_token>
 dvc remote modify origin --local secret_access_key <your_dagshub_token>
 
@@ -58,13 +58,13 @@ dvc remote modify origin --local secret_access_key <your_dagshub_token>
 dvc pull -r origin data/raw
 
 # --- MLflow credentials (DagsHub personal access token) ---
-export DAGSHUB_REPO_OWNER=AnanthS
+export DAGSHUB_REPO_OWNER=poojariprakash88
 export DAGSHUB_REPO_NAME=truestates-ml-ops
 export DAGSHUB_TOKEN=<your_dagshub_token>       # used by dagshub.init() for auth
 ```
 
 `dagshub.init(..., mlflow=True)` in `src/utils/mlflow_utils.py` automatically sets
-`MLFLOW_TRACKING_URI` to `https://dagshub.com/AnanthS/truestates-ml-ops.mlflow`
+`MLFLOW_TRACKING_URI` to `https://dagshub.com/poojariprakash88/truestates-ml-ops.mlflow`
 and authenticates using `DAGSHUB_TOKEN` — no manual `mlflow.set_tracking_uri()` needed.
 
 ## 3. Running the pipeline
