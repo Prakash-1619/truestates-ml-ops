@@ -27,7 +27,7 @@ def run(config: dict):
 
         t0 = time.time()
         import regression_modeling_log_parquet_yaml_multi as modeling_module
-        result = modeling_module.run_model_training(config)
+        result = modeling_module.run_model_training() #config
         duration = time.time() - t0
         mlflow.log_metric("modeling_duration_sec", duration)
 
