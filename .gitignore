@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+mlruns/
+pipeline_run.log
+*.prev
+.dvc/cache
+.dvc/tmp

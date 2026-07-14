@@ -1,0 +1,96 @@
+# ==============================================================================
+# GLOBAL PATH CONFIGURATION  (DagsHub S3-compatible storage bucket)
+# ==============================================================================
+# DagsHub exposes a DVC/S3-compatible remote at:
+#   s3://truestates-ml-ops/raw/...
+# Configure once via:
+#   dvc remote add origin s3://truestates-ml-ops -f
+#   dvc remote modify origin endpointurl https://dagshub.com/AnanthS/truestates-ml-ops.s3
+#   dvc remote modify origin --local access_key_id  <dagshub_token>
+#   dvc remote modify origin --local secret_access_key <dagshub_token>
+paths:
+  base_dir: "data/raw"          # local working copy tracked by DVC, pulled from s3://truestates-ml-ops/raw
+  processed_dir: "data/processed"
+  s3_bucket: "s3://truestates-ml-ops"
+  s3_raw_prefix: "raw"
+
+  # Ingestion (DVC-tracked raw inputs -> s3://truestates-ml-ops/raw/*)
+  projects_file: "projects.parquet"
+  developers_file: "developers.parquet"
+  buildings_file: "buildings.parquet"
+  units_file: "units.parquet"
+  ingestion_output: "latest_pdbu_df.csv"
+
+  # Transaction Processing
+  transactions_input: "transactions.parquet"
+  transactions_output: "unit_res_trans_16.parquet"
+
+  # Merging
+  merging_input_trans: "unit_res_trans_16.parquet"
+  merging_input_micro: "latest_pdbu_df.csv"
+  merging_output: "latest_combined_data.parquet"
+  outliers_metadata: "metadata_outliers_cleaning.csv"
+
+  # Excel Scorecard Files (raw bucket)
+  project_grade: "project_scorecard.xlsx"
+  dev_grade: "developer_scorecard.xlsx"
+  bld_grade: "Dubai_RE_Classification_DLD.xlsx"
+
+  # Regression Model
+  model_input: "latest_combined_data.parquet"
+  models_dir: "models"
+  columns_dir: "trained_columns"
+  metrics_file: "all_area_metrics.csv"
+  ranges_file: "input_ranges.csv"
+
+  # Market Forecasting
+  forecast_input: "unit_res_trans_16.parquet"
+  historic_output: "historic_df.csv"
+  growth_output: "forecast_df.csv"
+  forecast_metadata: "forecasting_metadata.csv"
+
+  # Chronos Forecasting
+  chronos_input: "unit_res_trans_16.parquet"
+  chronos_output: "final_chronos_forecasts.csv"
+  chronos_backtest_output: "chronos_backtest_metrics.csv"
+  chronos_historic_output: "chronos_historical_baseline.csv"
+
+  # Macro-News Impact Pipeline
+  area_sens_path: "utils/area_sensitivity.json"
+  entity_tiers_path: "utils/entity_tiers.json"
+  event_scales_path: "utils/event_scale_bins.json"
+  event_to_channel_path: "utils/event_to_channel.json"
+  geo_relevance_path: "utils/geo_relevance.json"
+  adjusted_forecast_output: "adjusted_macro_forecast.csv"
+  news_context_file: "news_context.json"
+
+  # Archive
+  old_files_dir: "old_files"
+
+# ==============================================================================
+# MLFLOW / DAGSHUB TRACKING
+# ==============================================================================
+mlflow:
+  repo_owner: "AnanthS"
+  repo_name: "truestates-ml-ops"
+  experiment_ingestion: "Ingestion"
+  experiment_cleaning: "Cleaning"
+  experiment_merging: "Merging"
+  experiment_modeling: "Modeling"
+  experiment_forecasting: "Forecasting"
+  experiment_forecasting_news: "Forecasting_News"
+
+drift:
+  numeric_cols_for_data_drift:
+    - procedure_area
+    - meter_sale_price
+    - Score
+  model_metric_key: "r2"
+  metric_drift_threshold_pct: 0.10
+
+# ==============================================================================
+# (rest of settings identical to your original config — ingestion_columns,
+#  transaction_settings, merging_params, model_params, training_columns,
+#  training_logic, market_mappings, forecast_settings, forecasting_settings,
+#  archive, macro_news_settings, area_mapping — unchanged, keep as-is below)
+# ==============================================================================

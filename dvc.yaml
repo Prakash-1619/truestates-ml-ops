@@ -1,0 +1,73 @@
+stages:
+  ingestion:
+    cmd: python src/ingestion/run.py
+    deps:
+      - src/ingestion/run.py
+      - micro_data_preparation_yaml.py
+      - config.yaml
+      - data/raw/projects.parquet
+      - data/raw/developers.parquet
+      - data/raw/buildings.parquet
+      - data/raw/units.parquet
+    outs:
+      - data/processed/latest_pdbu_df.csv
+
+  cleaning:
+    cmd: python src/cleaning/run.py
+    deps:
+      - src/cleaning/run.py
+      - transactions_data_main_parquet_yaml.py
+      - config.yaml
+      - data/raw/transactions.parquet
+    outs:
+      - data/processed/unit_res_trans_16.parquet
+
+  merging:
+    cmd: python src/merging/run.py
+    deps:
+      - src/merging/run.py
+      - transactions_data_preparation_mode_parquet_yaml.py
+      - config.yaml
+      - data/processed/unit_res_trans_16.parquet
+      - data/processed/latest_pdbu_df.csv
+      - data/raw/project_scorecard.xlsx
+      - data/raw/developer_scorecard.xlsx
+      - data/raw/Dubai_RE_Classification_DLD.xlsx
+    outs:
+      - data/processed/latest_combined_data.parquet
+      - data/processed/metadata_outliers_cleaning.csv
+
+  modeling:
+    cmd: python src/modeling/run.py
+    deps:
+      - src/modeling/run.py
+      - regression_modeling_log_parquet_yaml_multi.py
+      - config.yaml
+      - data/processed/latest_combined_data.parquet
+    outs:
+      - data/processed/models
+      - data/processed/trained_columns
+      - data/processed/all_area_metrics.csv
+      - data/processed/input_ranges.csv
+
+  forecasting:
+    cmd: python src/forecasting/run.py
+    deps:
+      - src/forecasting/run.py
+      - forecasting_engine_chronos.py
+      - config.yaml
+      - data/processed/unit_res_trans_16.parquet
+    outs:
+      - data/processed/final_chronos_forecasts.csv
+      - data/processed/chronos_backtest_metrics.csv
+      - data/processed/chronos_historical_baseline.csv
+
+  forecasting_news:
+    cmd: python src/forecasting_news/run.py
+    deps:
+      - src/forecasting_news/run.py
+      - forecasting_engine_chronos_news.py
+      - config.yaml
+      - data/processed/unit_res_trans_16.parquet
+    outs:
+      - data/processed/adjusted_macro_forecast.csv
