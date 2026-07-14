@@ -29,7 +29,7 @@ def run(config: dict):
 
         t0 = time.time()
         import transactions_data_main_parquet_yaml as cleaning_module
-        result = cleaning_module.run_transaction_processing(config)
+        result = cleaning_module.run_transaction_processing() #config
         duration = time.time() - t0
 
         out_path = os.path.join(config["paths"]["base_dir"], config["paths"]["transactions_output"])
