@@ -238,8 +238,11 @@ def run_ingestion():
     # KEY FIXED: Changed 'output_file' to 'ingestion_output'
     out_path = config['paths']['ingestion_output']
     print(f"⏳ Saving to {out_path}...")
-    final_df.to_csv(out_path, index=False)
     
+    # Wrap the save operation in the DagsHub filesystem client
+    with fs.open(out_path, "w") as f:
+        final_df.to_csv(f, index=False)
+        
     print(f"✅ Ingestion Complete! Shape: {final_df.shape} | Time: {time.time() - start_total:.2f}s")
     return final_df
 
