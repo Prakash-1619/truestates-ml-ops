@@ -34,7 +34,8 @@ fs = s3fs.S3FileSystem(
 _orig_read_parquet = pd.read_parquet
 def _safe_read_parquet(path, *args, **kwargs):
     if isinstance(path, str) and path.startswith("s3://"):
-        with fs.open(path, "rb") as f:
+        clean_path = path.replace("s3://", "")  # <-- THIS FIXES THE 404!
+        with fs.open(clean_path, "rb") as f:
             return _orig_read_parquet(f, *args, **kwargs)
     return _orig_read_parquet(path, *args, **kwargs)
 pd.read_parquet = _safe_read_parquet
@@ -43,7 +44,8 @@ pd.read_parquet = _safe_read_parquet
 _orig_read_csv = pd.read_csv
 def _safe_read_csv(filepath_or_buffer, *args, **kwargs):
     if isinstance(filepath_or_buffer, str) and filepath_or_buffer.startswith("s3://"):
-        with fs.open(filepath_or_buffer, "rb") as f:
+        clean_path = filepath_or_buffer.replace("s3://", "")
+        with fs.open(clean_path, "rb") as f:
             return _orig_read_csv(f, *args, **kwargs)
     return _orig_read_csv(filepath_or_buffer, *args, **kwargs)
 pd.read_csv = _safe_read_csv
@@ -52,7 +54,8 @@ pd.read_csv = _safe_read_csv
 _orig_to_parquet = pd.DataFrame.to_parquet
 def _safe_to_parquet(self, path=None, *args, **kwargs):
     if isinstance(path, str) and path.startswith("s3://"):
-        with fs.open(path, "wb") as f:
+        clean_path = path.replace("s3://", "")
+        with fs.open(clean_path, "wb") as f:
             return _orig_to_parquet(self, f, *args, **kwargs)
     return _orig_to_parquet(self, path, *args, **kwargs)
 pd.DataFrame.to_parquet = _safe_to_parquet
@@ -61,7 +64,8 @@ pd.DataFrame.to_parquet = _safe_to_parquet
 _orig_to_csv = pd.DataFrame.to_csv
 def _safe_to_csv(self, path_or_buf=None, *args, **kwargs):
     if isinstance(path_or_buf, str) and path_or_buf.startswith("s3://"):
-        with fs.open(path_or_buf, "wb") as f:
+        clean_path = path_or_buf.replace("s3://", "")
+        with fs.open(clean_path, "wb") as f:
             return _orig_to_csv(self, f, *args, **kwargs)
     return _orig_to_csv(self, path_or_buf, *args, **kwargs)
 pd.DataFrame.to_csv = _safe_to_csv
