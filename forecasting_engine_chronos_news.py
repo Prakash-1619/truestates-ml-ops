@@ -9,6 +9,10 @@ import json
 import logging
 from tqdm import tqdm
 import yaml
+from dagshub import get_repo_bucket_client
+
+# Initialize DagsHub client globally
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -167,9 +171,9 @@ def fill_missing_with_column_name(df: pd.DataFrame) -> pd.DataFrame:
 
 def load_json_config(filepath: str, default_val: Any = None) -> Any:
     try:
-        with open(filepath, "r") as f:
+        with fs.open(filepath, "r") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
+    except Exception as e:
         logger.warning(f"Failed to load {filepath}. Using default. Error: {e}")
         return default_val if default_val is not None else {}
 
@@ -610,9 +614,11 @@ class NarrativeSynthesizer:
     @staticmethod
     def load_previous_context(filepath: str) -> dict:
         try:
-            with open(filepath, "r") as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
+            if fs.exists(filepath):
+                with fs.open(filepath, "r") as f:
+                    return json.load(f)
+            return {}
+        except Exception:
             logger.info("No valid previous context found. Proceeding with None.")
             return {}
 
@@ -802,14 +808,14 @@ VERDICT: Is this a temporary shock or a permanent repricing? Keep it one sentenc
 def run_market_forecasting_pipeline(chronos_df: pd.DataFrame, area_to_id: dict) -> pd.DataFrame:
     logger.info("Initializing configuration and fetching news...")
 
-    base_dir = paths_config.get("base_dir", ".")
-
-    area_sens_path = os.path.join(base_dir, paths_config.get("area_sens_path", "utils/area_sensitivity.json"))
-    entity_tiers_path = os.path.join(base_dir, paths_config.get("entity_tiers_path", "utils/entity_tiers.json"))
-    event_scales_path = os.path.join(base_dir, paths_config.get("event_scales_path", "utils/event_scale_bins.json"))
-    event_to_channel_path = os.path.join(base_dir, paths_config.get("event_to_channel_path", "utils/event_to_channel.json"))
-    geo_relevance_path = os.path.join(base_dir, paths_config.get("geo_relevance_path", "utils/geo_relevance.json"))
-    news_context_file = os.path.join(base_dir, paths_config.get("news_context_file", "news_context.json"))
+    base_dir = paths_config.get("base_dir", ".").replace("s3://", "")
+    
+    area_sens_path = f"{base_dir}/{paths_config.get('area_sens_path', 'utils/area_sensitivity.json')}"
+    entity_tiers_path = f"{base_dir}/{paths_config.get('entity_tiers_path', 'utils/entity_tiers.json')}"
+    event_scales_path = f"{base_dir}/{paths_config.get('event_scales_path', 'utils/event_scale_bins.json')}"
+    event_to_channel_path = f"{base_dir}/{paths_config.get('event_to_channel_path', 'utils/event_to_channel.json')}"
+    geo_relevance_path = f"{base_dir}/{paths_config.get('geo_relevance_path', 'utils/geo_relevance.json')}"
+    news_context_file = f"{base_dir}/{paths_config.get('news_context_file', 'news_context.json')}"
 
     entity_tiers = load_json_config(entity_tiers_path, {})
     event_scales = load_json_config(event_scales_path, {})
@@ -891,11 +897,14 @@ def execute_pipeline_entry(config=None):
         MODEL = macro_news_settings.get("llm_model", "gpt-oss:120b-cloud")
         PROJECTION_MONTHS_AHEAD = macro_news_settings.get("projection_months_ahead", 6)
 
-    base_dir = paths_config.get("base_dir", ".")
-    forecast_file = os.path.join(base_dir, paths_config.get("chronos_output", "final_chronos_forecasts.csv"))
-    output_file = os.path.join(base_dir, paths_config.get("adjusted_forecast_output", "adjusted_macro_forecast.csv"))
+    base_dir = paths_config.get("base_dir", ".").replace("s3://", "")
+    forecast_file = f"{base_dir}/{paths_config.get('chronos_output', 'model_requirements/final_chronos_forecasts.csv')}"
+    output_file = f"{base_dir}/{paths_config.get('adjusted_forecast_output', 'model_requirements/adjusted_macro_forecast.csv')}"
 
-    raw_df = pd.read_csv(forecast_file)
+    # Wrap the CSV read
+    with fs.open(forecast_file, "rb") as f:
+        raw_df = pd.read_csv(f)
+        
     raw_df = drop_duplicate_columns(raw_df)
 
     logger.info(f"Forecast file columns: {list(raw_df.columns)}")
@@ -925,8 +934,10 @@ def execute_pipeline_entry(config=None):
     area_to_id_mapping = dict(zip(area_to_id_mapping["area"], area_to_id_mapping["area_id"]))
 
     final_df = run_market_forecasting_pipeline(test_df, area_to_id_mapping)
-    final_df.to_csv(output_file, index=False)
-
+    # Wrap the CSV write
+    with fs.open(output_file, "w") as f:
+        final_df.to_csv(f, index=False)
+        
     logger.info(f"Adjusted macro forecast saved to: {output_file}")
     return final_df
 
