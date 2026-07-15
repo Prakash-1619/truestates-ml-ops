@@ -1,13 +1,17 @@
 import os
+import os
 import re
 import logging
-import shutil
 import numpy as np
 import pandas as pd
 import torch
 import yfinance as yf
 from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from chronos import Chronos2Pipeline
+from dagshub import get_repo_bucket_client
+
+# Initialize DagsHub client globally
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -19,9 +23,10 @@ def ensure_old_dir(base_dir, config):
     return old_dir
 
 def archive_existing_file(file_path, old_dir, prefix="old_"):
-    if os.path.exists(file_path):
-        archived_path = os.path.join(old_dir, f"{prefix}{os.path.basename(file_path)}")
-        shutil.move(file_path, archived_path)
+    if fs.exists(file_path):
+        filename = file_path.split('/')[-1]
+        archived_path = f"{old_dir}/{prefix}{filename}"
+        fs.rename(file_path, archived_path)
 
 class DubaiPropertyForecaster:
     def __init__(self, model_name="amazon/chronos-2", prediction_length=6, backtest_periods=6, zero_threshold=0.90):
@@ -179,13 +184,15 @@ class DubaiPropertyForecaster:
         monthly_df['model_area_id'] = monthly_df['area_name_en'].map(model_id_map)
 
         return monthly_df, source_id_map, model_id_map
-
+    
     def process_and_engineer_data(self, trans_path):
         logger.info("Initializing baseline transaction frame data prep...")
-        if trans_path.endswith('.parquet'):
-            df_copy = pd.read_parquet(trans_path)
-        else:
-            df_copy = pd.read_csv(trans_path)
+        
+        with fs.open(trans_path, "rb") as f:
+            if trans_path.endswith('.parquet'):
+                df_copy = pd.read_parquet(f)
+            else:
+                df_copy = pd.read_csv(f)
 
         df_copy["date"] = pd.to_datetime(df_copy["instance_date"])
         df_copy["month"] = df_copy["date"].dt.to_period("M").apply(lambda r: r.start_time)
@@ -362,33 +369,40 @@ def run_entire_pipeline(trans_path, config_settings):
 
 def execute_pipeline_entry(config):
     logger.info("Starting Forecasting Stage Orchestration...")
-    base_dir = config['paths']['base_dir']
-    input_path = os.path.join(base_dir, config['paths']['chronos_input'])
-    output_path = os.path.join(base_dir, config['paths']['chronos_output'])
-    backtest_path = os.path.join(base_dir, config['paths']['chronos_backtest_output'])
-    historic_path = os.path.join(base_dir, config['paths']['chronos_historic_output'])
-    old_dir = os.path.join(base_dir, config['paths'].get('old_files_dir', 'old_files'))
-    os.makedirs(old_dir, exist_ok=True)
-
+    
+    # Construct proper S3 paths natively
+    base = config['paths']['base_dir'].replace("s3://", "")
+    input_path = f"{base}/{config['paths']['chronos_input']}"
+    output_path = f"{base}/{config['paths']['chronos_output']}"
+    backtest_path = f"{base}/{config['paths']['chronos_backtest_output']}"
+    historic_path = f"{base}/{config['paths']['chronos_historic_output']}"
+    old_dir = f"{base}/{config['paths'].get('old_files_dir', 'old_files')}"
+    
     forecast_settings = config.get('forecasting_settings', {})
     prefix = config.get('archive', {}).get('prefix', 'old_')
-
+    
+    # Archive old forecasts
     archive_existing_file(output_path, old_dir, prefix)
     archive_existing_file(backtest_path, old_dir, prefix)
     archive_existing_file(historic_path, old_dir, prefix)
-
+    
     logger.info(f"Target Input File: {input_path}")
     backtest, forecast, historic = run_entire_pipeline(input_path, forecast_settings)
-
-    forecast.to_csv(output_path, index=False)
-    historic.to_csv(historic_path, index=False)
+    
+    # Save new forecasts directly to S3
+    with fs.open(output_path, "w") as f:
+        forecast.to_csv(f, index=False)
+    with fs.open(historic_path, "w") as f:
+        historic.to_csv(f, index=False)
+        
     logger.info(f"✅ Forecasting engine outputs successfully saved to: {output_path}")
     logger.info(f"✅ Historical timeline successfully saved to: {historic_path}")
-
+    
     if not backtest.empty:
-        backtest.to_csv(backtest_path, index=False)
+        with fs.open(backtest_path, "w") as f:
+            backtest.to_csv(f, index=False)
         logger.info(f"✅ Backtest metrics successfully saved to: {backtest_path}")
     else:
         logger.warning("⚠️ No backtest metrics were generated to save.")
-
+        
     return backtest, forecast, historic
