@@ -9,8 +9,8 @@
 #   dvc remote modify origin --local access_key_id  <dagshub_token>
 #   dvc remote modify origin --local secret_access_key <dagshub_token>
 paths:
-  base_dir: "raw"          # local working copy tracked by DVC, pulled from s3://truestates-ml-ops/raw # data/
-  processed_dir: "processed" # data/
+  base_dir: "data/raw"          # local working copy tracked by DVC, pulled from s3://truestates-ml-ops/raw # data/
+  processed_dir: "data/processed" # data/
   s3_bucket: "s3://truestates-ml-ops"
   s3_raw_prefix: "raw"
 
