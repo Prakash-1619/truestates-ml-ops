@@ -1,9 +1,3 @@
-"""
-Main orchestrator for the TruEstates ML-Ops pipeline.
-Runs: Ingestion -> Cleaning -> Merging -> Modeling -> Forecasting -> Forecasting_news
-Each stage wrapper (src/<stage>/run.py) handles its own MLflow run + DVC-tracked outputs.
-"""
-# --- DagsHub Authentication ---
 import os
 import sys
 import time
@@ -11,22 +5,63 @@ import logging
 import yaml
 import warnings
 import subprocess
-import s3fs # Required for s3:// protocol streaming
+import pandas as pd
+import s3fs
 
 # --- DagsHub Authentication ---
 token = "8df26f9f871b7249cc698426d87853f4ea3d8655"
 os.environ["AWS_ACCESS_KEY_ID"] = token
 os.environ["AWS_SECRET_ACCESS_KEY"] = token
-
-# FIX 1: PyArrow requires the standard AWS_ENDPOINT_URL (without _S3)
 os.environ["AWS_ENDPOINT_URL"] = "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"
-
-# FIX 2: PyArrow requires a default region, otherwise it can crash during resolution
 os.environ["AWS_REGION"] = "us-east-1"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
-
-# FIX 3: Forces PyArrow to format the S3 URL correctly for DagsHub's custom servers
 os.environ["AWS_S3_FORCE_PATH_STYLE"] = "true"
+
+# =====================================================================
+# PANDAS S3 HIJACKER (Monkey Patch)
+# =====================================================================
+# This forces Pandas to bypass PyArrow's stubborn native C++ S3 client
+# and use our custom DagsHub s3fs configuration instead.
+
+dagshub_options = {
+    "key": token,
+    "secret": token,
+    "client_kwargs": {"endpoint_url": "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"}
+}
+
+# 1. Intercept read_parquet
+_orig_read_parquet = pd.read_parquet
+def _safe_read_parquet(path, *args, **kwargs):
+    if isinstance(path, str) and path.startswith("s3://"):
+        kwargs["storage_options"] = dagshub_options
+    return _orig_read_parquet(path, *args, **kwargs)
+pd.read_parquet = _safe_read_parquet
+
+# 2. Intercept read_csv
+_orig_read_csv = pd.read_csv
+def _safe_read_csv(filepath_or_buffer, *args, **kwargs):
+    if isinstance(filepath_or_buffer, str) and filepath_or_buffer.startswith("s3://"):
+        kwargs["storage_options"] = dagshub_options
+    return _orig_read_csv(filepath_or_buffer, *args, **kwargs)
+pd.read_csv = _safe_read_csv
+
+# 3. Intercept to_parquet
+_orig_to_parquet = pd.DataFrame.to_parquet
+def _safe_to_parquet(self, path=None, *args, **kwargs):
+    if isinstance(path, str) and path.startswith("s3://"):
+        kwargs["storage_options"] = dagshub_options
+    return _orig_to_parquet(self, path, *args, **kwargs)
+pd.DataFrame.to_parquet = _safe_to_parquet
+
+# 4. Intercept to_csv
+_orig_to_csv = pd.DataFrame.to_csv
+def _safe_to_csv(self, path_or_buf=None, *args, **kwargs):
+    if isinstance(path_or_buf, str) and path_or_buf.startswith("s3://"):
+        kwargs["storage_options"] = dagshub_options
+    return _orig_to_csv(self, path_or_buf, *args, **kwargs)
+pd.DataFrame.to_csv = _safe_to_csv
+# =====================================================================
+
 warnings.filterwarnings("ignore")
 
 PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,15 +82,12 @@ def load_config():
         config = yaml.safe_load(f)
         
     # --- BULLETPROOF S3 PATH INJECTOR ---
-    # This automatically intercepts the config and forces the s3:// protocol 
-    # onto all paths so Pandas knows to stream from DagsHub.
+    # Intercepts the config and forces the s3:// protocol onto all paths 
+    # so Pandas knows to stream from the correct folder in DagsHub.
     for key, value in config['paths'].items():
         if isinstance(value, str):
-            # If the string already has the bucket name but is missing s3://
             if value.startswith("truestates-ml-ops/"):
                 config['paths'][key] = "s3://" + value
-                
-            # If it is just a plain filename, we map it to the correct S3 folder!
             elif not value.startswith("s3://") and not value.startswith("utils/"):
                 filename = value.split("/")[-1]
                 
