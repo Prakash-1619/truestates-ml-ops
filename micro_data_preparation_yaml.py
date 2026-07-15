@@ -3,27 +3,36 @@ import os
 import time
 import yaml
 import re
+from dagshub import get_repo_bucket_client
+
+# Initialize DagsHub client globally for this script
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
 
 # --- 1. Load Configuration ---
 def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
+        
+    # Construct absolute paths (Strip s3:// prefix for DagsHub client)
+    base = config['paths']['raw_dir'].replace("s3://", "")
     
-    # Construct absolute paths
-    base = config['paths']['base_dir']
-    # KEYS FIXED: Updated to match your compiled config.yaml
     path_keys = ['projects_file', 'developers_file', 'buildings_file', 'units_file', 'ingestion_output']
     for key in path_keys:
         if key in config['paths']:
-            config['paths'][key] = os.path.join(base, config['paths'][key])
-    
+            # Use forward slashes for S3 paths instead of os.path.join
+            config['paths'][key] = f"{base}/{config['paths'][key]}"
+            
     return config
 
 # --- 2. Refactored Data Processing Functions ---
 
 def get_processed_project_data(config):
-    projects = pd. read_parquet(config['paths']['projects_file'])#, low_memory=False)
-    developers = pd.read_parquet(config['paths']['developers_file'])# , low_memory=False)
+    with fs.open(config['paths']['projects_file'], "rb") as f:
+        projects = pd.read_parquet(f)
+        
+    with fs.open(config['paths']['developers_file'], "rb") as f:
+        developers = pd.read_parquet(f)
+        
     
     # KEYS FIXED: Changed 'columns' to 'ingestion_columns'
     cols_pro = config['ingestion_columns']['projects']
@@ -39,7 +48,9 @@ def get_processed_project_data(config):
     return pd_df
 
 def get_processed_building_data(config, pd_df):
-    buildings = pd.read_parquet(config['paths']['buildings_file'])#, low_memory=False , on_bad_lines='warn')
+    with fs.open(config['paths']['buildings_file'], "rb") as f:
+        buildings = pd.read_parquet(f)
+        
     # KEY FIXED: Changed 'columns' to 'ingestion_columns'
     cols_build = config['ingestion_columns']['buildings']
     
@@ -49,7 +60,10 @@ def get_processed_building_data(config, pd_df):
     return pdb_df
 
 def get_final_integrated_data(config, pdb_df):
-    unit =  pd.read_parquet(config['paths']['units_file'])#, low_memory=False)
+    with fs.open(config['paths']['units_file'], "rb") as f:
+        unit = pd.read_parquet(f)
+        
+    # (Keep the rest of your dropping logic exactly the same below this...)
 
     # 1. Cleaning & Dropping
     # KEY FIXED: Changed 'processing' to 'ingestion_processing'
