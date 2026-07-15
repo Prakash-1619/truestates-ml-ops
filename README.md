@@ -44,6 +44,8 @@ main.py
 
 ```bash
 git clone https://dagshub.com/poojariprakash88/truestates-ml-ops.git
+or
+git clone https://poojariprakash88:<your_dagshub_token>@dagshub.com/poojariprakash88/truestates-ml-ops.git
 cd truestates-ml-ops
 pip install -r requirements.txt
 
