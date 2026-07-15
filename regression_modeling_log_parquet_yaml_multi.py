@@ -15,6 +15,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error, mean_absolute_error
 
+from dagshub import get_repo_bucket_client
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
+
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,30 +27,26 @@ pd.set_option('io.parquet.engine', 'pyarrow')
 
 def ensure_old_dir(base_dir, config):
     folder = config.get('archive', {}).get('folder_name', 'old_files')
-    old_dir = os.path.join(base_dir, folder)
-    os.makedirs(old_dir, exist_ok=True)
-    return old_dir
+    return f"{base_dir}/{folder}"
 
 def archive_existing_file(file_path, old_dir, prefix="old_"):
-    if os.path.exists(file_path):
-        archived_path = os.path.join(old_dir, f"{prefix}{os.path.basename(file_path)}")
-        shutil.move(file_path, archived_path)
+    if fs.exists(file_path):
+        filename = file_path.split('/')[-1]
+        archived_path = f"{old_dir}/{prefix}{filename}"
+        fs.rename(file_path, archived_path)
 
 def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
-
-    base = config['paths']['base_dir']
-    config['paths']['input_full'] = os.path.join(base, config['paths']['model_input'])
-    config['paths']['m_dir'] = os.path.join(base, config['paths']['models_dir'])
-    config['paths']['c_dir'] = os.path.join(base, config['paths']['columns_dir'])
-    config['paths']['metrics_path'] = os.path.join(base, config['paths'].get('metrics_file', 'all_area_metrics.csv'))
-    config['paths']['ranges_path'] = os.path.join(base, config['paths'].get('ranges_file', 'input_ranges.csv'))
-    config['paths']['old_dir'] = os.path.join(base, config['paths'].get('old_files_dir', 'old_files'))
-
-    os.makedirs(config['paths']['m_dir'], exist_ok=True)
-    os.makedirs(config['paths']['c_dir'], exist_ok=True)
-    os.makedirs(config['paths']['old_dir'], exist_ok=True)
+    base = config['paths']['base_dir'].replace("s3://", "")
+    
+    # Natively construct the paths using S3 format instead of os.path.join
+    config['paths']['input_full'] = f"{base}/{config['paths']['model_input']}"
+    config['paths']['m_dir'] = f"{base}/{config['paths']['models_dir']}"
+    config['paths']['c_dir'] = f"{base}/{config['paths']['columns_dir']}"
+    config['paths']['metrics_path'] = f"{base}/{config['paths'].get('metrics_file', 'processed/all_area_metrics.csv')}"
+    config['paths']['ranges_path'] = f"{base}/{config['paths'].get('ranges_file', 'model_requirements/input_ranges.csv')}"
+    config['paths']['old_dir'] = f"{base}/{config['paths'].get('old_files_dir', 'old_files')}"
     return config
 
 def train_and_save(name, area_df, target, config, cat_cols, num_cols, date_col='instance_date'):
@@ -215,8 +214,10 @@ def train_and_save(name, area_df, target, config, cat_cols, num_cols, date_col='
 
         final_cols = list(X_train_raw.columns) if best_area_metrics['best_algorithm'] == 'CatBoost' else list(X_train_enc.columns)
 
-        joblib.dump(best_area_model, model_filepath)
-        joblib.dump(final_cols, cols_filepath)
+        with fs.open(model_filepath, "wb") as f:
+            joblib.dump(best_area_model, f)
+        with fs.open(cols_filepath, "wb") as f:
+            joblib.dump(final_cols, f)
 
     return best_area_metrics, summary_dict, param_logs
 
@@ -234,7 +235,8 @@ def run_model_training():
     logger.info(f"🔍 Base Features Loaded: {len(cat_cols)} Categorical, {len(num_cols)} Numerical")
     logger.info("=======================================================================================")
 
-    df_raw = pd.read_parquet(config['paths']['input_full'])
+    with fs.open(config['paths']['input_full'], "rb") as f:
+        df_raw = pd.read_parquet(f)
 
     trans_filters = config.get('training_logic', {}).get('trans_group_filter', None)
     if trans_filters and 'trans_group_en' in df_raw.columns:
@@ -320,9 +322,12 @@ def run_model_training():
     archive_existing_file(params_path, old_dir, prefix)
 
     if best_results:
-        pd.DataFrame(best_results).to_csv(metrics_path, index=False)
-        pd.DataFrame(summaries).to_csv(ranges_path, index=False)
-        pd.DataFrame(all_param_logs).to_csv(params_path, index=False)
+        with fs.open(metrics_path, "w") as f:
+            pd.DataFrame(best_results).to_csv(f, index=False)
+        with fs.open(ranges_path, "w") as f:
+            pd.DataFrame(summaries).to_csv(f, index=False)
+        with fs.open(params_path, "w") as f:
+            pd.DataFrame(all_param_logs).to_csv(f, index=False)
         logger.info("🎉 Training Complete. All metrics and tuning logs saved to base directory.")
     else:
         logger.error("❌ No models were successfully trained.")
