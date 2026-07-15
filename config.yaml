@@ -5,7 +5,7 @@
 #   s3://truestates-ml-ops/raw/...
 # Configure once via:
 #   dvc remote add origin s3://truestates-ml-ops -f
-#   dvc remote modify origin endpointurl https://dagshub.com/AnanthS/truestates-ml-ops.s3
+#   dvc remote modify origin endpointurl https://dagshub.com/poojariprakash88/truestates-ml-ops.s3
 #   dvc remote modify origin --local access_key_id  <dagshub_token>
 #   dvc remote modify origin --local secret_access_key <dagshub_token>
 paths:
