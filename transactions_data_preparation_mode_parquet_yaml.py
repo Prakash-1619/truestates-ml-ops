@@ -4,6 +4,11 @@ import os
 import time
 import yaml
 import logging
+from dagshub import get_repo_bucket_client
+
+# Initialize DagsHub client globally
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
+
 
 # ---------------------------------------------------------
 # LOGGING CONFIGURATION
@@ -106,7 +111,8 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
     logger.info("Loading main transaction data...")
 
     # 1. Load Transactions Data
-    df = pd.read_parquet(trans_path)
+    with fs.open(trans_path, "rb") as f:
+        df = pd.read_parquet(f)
 
     # 2. Filter Out Invalid Rooms
     room_col = 'rooms_en' 
@@ -128,7 +134,8 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
     df['trans_ubp_key'] = sub_type + '-' + area_id + '-' + proj_num + '-' + rooms + '-' + proc_area
 
     # 5. Load & Clean Micro Data
-    micro_df = pd.read_csv(micro_path, low_memory=False)
+    with fs.open(micro_path, "rb") as f:
+        micro_df = pd.read_csv(f, low_memory=False)
     micro_df = micro_df.loc[:, ~micro_df.columns.str.endswith('_y')]
     micro_df.columns = [c[:-2] if c.endswith('_x') else c for c in micro_df.columns]
     
@@ -177,8 +184,10 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
         logger.info(f"   -> Missing developer_name_en: {missing_dev_name_before}")
 
         # Load Parquet Files
-        projects_df = pd.read_parquet(projects_path)
-        developers_df = pd.read_parquet(developers_path)
+        with fs.open(projects_path, "rb") as f:
+            projects_df = pd.read_parquet(f)
+        with fs.open(developers_path, "rb") as f:
+            developers_df = pd.read_parquet(f)
         
         # 1. Merge Projects to get developer_number
         if 'project_number' in df.columns and 'project_number' in projects_df.columns:
@@ -254,9 +263,12 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
     df['project_name_en'] = df['project_name_en'].astype(str).str.strip()
 
     # A. Merge Building Data
-    if os.path.exists(bld_grade_path):
+    if fs.exists(bld_grade_path):
         cols_before = set(df.columns)
-        bld_df = pd.read_excel(bld_grade_path, sheet_name='BLD_class')
+        
+        with fs.open(bld_grade_path, "rb") as f:
+            bld_df = pd.read_excel(f, sheet_name='BLD_class')
+            
         bld_df['Building Name'] = bld_df['Building Name'].astype(str).str.strip()
         
         bld_cols = ['Building Name', 'Price/sqft (AED)', 'Locality Zone', 'Score', 'Grade', 'Price Tier', 'Reputation']
@@ -277,9 +289,12 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
         logger.warning(f"⚠️ MISSING FILE: Could not find Building scorecard at {bld_grade_path}")
 
     # B. Merge Developer Scorecard
-    if os.path.exists(dev_grade_path):
+    if fs.exists(dev_grade_path):
         cols_before = set(df.columns)
-        dev_df = pd.read_excel(dev_grade_path, sheet_name='developer_scorecard')
+        
+        with fs.open(dev_grade_path, "rb") as f:
+            dev_df = pd.read_excel(f, sheet_name='developer_scorecard')
+            
         dev_df['Developer Name'] = dev_df['Developer Name'].astype(str).str.strip()
         
         dev_cols = ['Developer Name', 'Developer Score (0-100)', 'Grade', 'Developer Tier']
@@ -298,9 +313,12 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
         logger.warning(f"⚠️ MISSING FILE: Could not find Developer scorecard at {dev_grade_path}")
 
     # C. Merge Project Scorecard
-    if os.path.exists(proj_grade_path):
+    if fs.exists(proj_grade_path):
         cols_before = set(df.columns)
-        proj_df = pd.read_excel(proj_grade_path, sheet_name='Scored Projects')
+        
+        with fs.open(proj_grade_path, "rb") as f:
+            proj_df = pd.read_excel(f, sheet_name='Scored Projects')
+            
         proj_df['Project Name'] = proj_df['Project Name'].astype(str).str.strip()
         
         proj_cols = ['Project Name', 'Developer Reputation Tier', 'Location / Positioning Tier', 
@@ -373,63 +391,56 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
     # 12. Save Output
     # ---------------------------------------------------------
     logger.info(f"Saving final file to {output_path}...")
-    df.to_parquet(output_path, index=False, engine='pyarrow')
+    with fs.open(output_path, "wb") as f:
+        df.to_parquet(f, index=False, engine='pyarrow')
     logger.info(f"✅ Final file saved successfully. Shape: {df.shape} | Time: {time.time() - start_proc:.2f}s")
     
     return df
 
 def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+        
+    # Grab base directory and strip 's3://'
+    base = config['paths']['base_dir'].replace("s3://", "")
+    
+    # Attach base to all file paths natively
+    for key, value in config['paths'].items():
+        if isinstance(value, str) and (value.endswith('.csv') or value.endswith('.parquet') or value.endswith('.xlsx')):
+            config['paths'][key] = f"{base}/{value}"
+            
+    return config
 
 def run_merging_pipeline():
     pd.set_option('io.parquet.engine', 'pyarrow')
-    
     try:
         config = load_config()
-        data_dir = config['paths']['base_dir']
         
-        # Load core pipeline files
-        trans_file = config['paths']['merging_input_trans']
-        micro_file = config['paths']['merging_input_micro']
-        output_file_name = config['paths']['merging_output']
-        
-        # Extracted Parquet Files (with fallbacks if missing from YAML)
-        proj_parquet = config['paths'].get('projects_file', 'projects.parquet')
-        dev_parquet = config['paths'].get('developers_file', 'developers.parquet')
-
-        # Excel Scorecards
-        proj_grade_file = config['paths'].get('project_grade', 'project_scorecard.xlsx')
-        dev_grade_file = config['paths'].get('dev_grade', 'developer_scorecard.xlsx')
-        bld_grade_file = config['paths'].get('bld_grade', 'Dubai_RE_Classification_DLD.xlsx')
-        
+        # Load core pipeline files straight from the clean config!
+        paths_dict = {
+            'transactions': config['paths']['merging_input_trans'],
+            'micro_metadata': config['paths']['merging_input_micro'],
+            'projects_path': config['paths'].get('projects_file'),
+            'developers_path': config['paths'].get('developers_file'),
+            'proj_grade_path': config['paths'].get('project_grade'),
+            'dev_grade_path': config['paths'].get('dev_grade'),
+            'bld_grade_path': config['paths'].get('bld_grade'),
+            'output': config['paths']['merging_output']
+        }
     except KeyError as e:
-        logger.error(f"❌ Missing key in config.yaml: {e}. Please ensure it is defined in the 'paths' section!")
+        logger.error(f"❌ Missing key in config.yaml: {e}")
         return None
-        
-    paths_dict = {
-        'transactions': os.path.join(data_dir, trans_file),
-        'micro_metadata': os.path.join(data_dir, micro_file),
-        'projects_path': os.path.join(data_dir, proj_parquet),
-        'developers_path': os.path.join(data_dir, dev_parquet),
-        'proj_grade_path': os.path.join(data_dir, proj_grade_file),
-        'dev_grade_path': os.path.join(data_dir, dev_grade_file),
-        'bld_grade_path': os.path.join(data_dir, bld_grade_file),
-        'output': os.path.join(data_dir, output_file_name)
-    }
-    
+
     logger.info("🚀 Starting Merge & Imputation Pipeline...")
-            
     return process_and_merge_transactions(
         trans_path=paths_dict['transactions'], 
         micro_path=paths_dict['micro_metadata'], 
-        output_path=paths_dict['output'],
-        proj_grade_path=paths_dict['proj_grade_path'],
-        dev_grade_path=paths_dict['dev_grade_path'],
-        bld_grade_path=paths_dict['bld_grade_path'],
-        projects_path=paths_dict['projects_path'],
-        developers_path=paths_dict['developers_path'],
-        data_dir=data_dir
+        output_path=paths_dict['output'], 
+        proj_grade_path=paths_dict['proj_grade_path'], 
+        dev_grade_path=paths_dict['dev_grade_path'], 
+        bld_grade_path=paths_dict['bld_grade_path'], 
+        projects_path=paths_dict['projects_path'], 
+        developers_path=paths_dict['developers_path']
     )
 
 if __name__ == "__main__":
