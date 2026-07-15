@@ -9,21 +9,23 @@ import time
 import logging
 import yaml
 import warnings
+import subprocess
+import s3fs # Required for s3:// protocol streaming
+
+# --- DagsHub Authentication ---
+token = "8df26f9f871b7249cc698426d87853f4ea3d8655"
+os.environ["AWS_ACCESS_KEY_ID"] = token
+os.environ["AWS_SECRET_ACCESS_KEY"] = token
+os.environ["AWS_ENDPOINT_URL_S3"] = "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"
 
 warnings.filterwarnings("ignore")
 
 PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(PIPELINE_DIR, "config.yaml")
 
-for sub in ["src/ingestion", "src/cleaning", "src/merging", "src/modeling",
-            "src/forecasting", "src/forecasting_news", "src/utils", "."]:
-    p = os.path.join(PIPELINE_DIR, sub)
-    if p not in sys.path:
-        sys.path.append(p)
+# Timestamped log filename
+log_filename = f"pipeline_run_{time.strftime('%Y%m%d_%H%M%S')}.log"
 
-log_filename = "pipeline_run.log"
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -31,14 +33,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        print(f"CRITICAL: config.yaml not found at {CONFIG_PATH}")
-        sys.exit(1)
     with open(CONFIG_PATH, "r") as f:
         return yaml.safe_load(f)
-
 
 STAGE_MODULES = {
     "Ingestion": "src.ingestion.run",
@@ -49,48 +46,29 @@ STAGE_MODULES = {
     "Forecasting_news": "src.forecasting_news.run",
 }
 
-
 def run_stage(stage_name, config):
     import importlib
     mod = importlib.import_module(STAGE_MODULES[stage_name])
     importlib.reload(mod)
     return mod.run(config)
 
-
 def run_full_dubai_pipeline(steps_to_run=None):
     config = load_config()
     pipeline_start = time.time()
+    logger.info("TRUESTATES ML-OPS: PIPELINE STARTING")
 
-    logger.info("=" * 60)
-    logger.info("TRUESTATES ML-OPS: FULL PIPELINE STARTING")
-    logger.info("=" * 60)
+    steps = steps_to_run or list(STAGE_MODULES.keys())
 
-    steps_to_run = steps_to_run or [
-        "Ingestion",
-        "Cleaning",
-        "Merging",
-        "Modeling",
-        "Forecasting",
-        "Forecasting_news",
-    ]
+    for i, step_name in enumerate(steps, 1):
+        logger.info(f"--- [STEP {i}/{len(steps)}]: {step_name} ---")
+        run_stage(step_name, config)
 
-    for i, step_name in enumerate(steps_to_run, 1):
-        step_start = time.time()
-        logger.info(f"--- [STEP {i}/{len(steps_to_run)}]: {step_name} ---")
-        try:
-            run_stage(step_name, config)
-            duration = time.time() - step_start
-            logger.info(f"{step_name} finished in {duration:.2f}s")
-        except Exception as e:
-            logger.error(f"ERROR in {step_name}: {e}", exc_info=True)
-            raise
-
-    total_duration = time.time() - pipeline_start
-    logger.info("=" * 60)
-    logger.info(f"PIPELINE COMPLETE in {total_duration/60:.2f} minutes")
-    logger.info("=" * 60)
-
+    # --- Auto-Sync Log to DagsHub via DVC ---
+    logger.info("Syncing logs to DagsHub...")
+    subprocess.run(["dvc", "add", log_filename], check=True)
+    subprocess.run(["dvc", "push", f"{log_filename}.dvc", "-r", "origin"], check=True)
+    
+    logger.info(f"PIPELINE COMPLETE. Log saved as {log_filename}")
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    run_full_dubai_pipeline(steps_to_run=args if args else None)
+    run_full_dubai_pipeline()
