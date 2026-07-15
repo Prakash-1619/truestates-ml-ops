@@ -20,20 +20,22 @@ os.environ["AWS_S3_FORCE_PATH_STYLE"] = "true"
 # =====================================================================
 # PANDAS S3 HIJACKER (Monkey Patch)
 # =====================================================================
-# This forces Pandas to bypass PyArrow's stubborn native C++ S3 client
-# and use our custom DagsHub s3fs configuration instead.
+# PyArrow's native S3 client strips the "s3://" prefix and ignores
+# our DagsHub configurations. To stop this, we manually open the connection
+# using s3fs and hand Pandas a raw byte stream so it never sees the URL!
 
-dagshub_options = {
-    "key": token,
-    "secret": token,
-    "client_kwargs": {"endpoint_url": "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"}
-}
+fs = s3fs.S3FileSystem(
+    key=token,
+    secret=token,
+    client_kwargs={"endpoint_url": "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"}
+)
 
 # 1. Intercept read_parquet
 _orig_read_parquet = pd.read_parquet
 def _safe_read_parquet(path, *args, **kwargs):
     if isinstance(path, str) and path.startswith("s3://"):
-        kwargs["storage_options"] = dagshub_options
+        with fs.open(path, "rb") as f:
+            return _orig_read_parquet(f, *args, **kwargs)
     return _orig_read_parquet(path, *args, **kwargs)
 pd.read_parquet = _safe_read_parquet
 
@@ -41,7 +43,8 @@ pd.read_parquet = _safe_read_parquet
 _orig_read_csv = pd.read_csv
 def _safe_read_csv(filepath_or_buffer, *args, **kwargs):
     if isinstance(filepath_or_buffer, str) and filepath_or_buffer.startswith("s3://"):
-        kwargs["storage_options"] = dagshub_options
+        with fs.open(filepath_or_buffer, "rb") as f:
+            return _orig_read_csv(f, *args, **kwargs)
     return _orig_read_csv(filepath_or_buffer, *args, **kwargs)
 pd.read_csv = _safe_read_csv
 
@@ -49,7 +52,8 @@ pd.read_csv = _safe_read_csv
 _orig_to_parquet = pd.DataFrame.to_parquet
 def _safe_to_parquet(self, path=None, *args, **kwargs):
     if isinstance(path, str) and path.startswith("s3://"):
-        kwargs["storage_options"] = dagshub_options
+        with fs.open(path, "wb") as f:
+            return _orig_to_parquet(self, f, *args, **kwargs)
     return _orig_to_parquet(self, path, *args, **kwargs)
 pd.DataFrame.to_parquet = _safe_to_parquet
 
@@ -57,7 +61,8 @@ pd.DataFrame.to_parquet = _safe_to_parquet
 _orig_to_csv = pd.DataFrame.to_csv
 def _safe_to_csv(self, path_or_buf=None, *args, **kwargs):
     if isinstance(path_or_buf, str) and path_or_buf.startswith("s3://"):
-        kwargs["storage_options"] = dagshub_options
+        with fs.open(path_or_buf, "wb") as f:
+            return _orig_to_csv(self, f, *args, **kwargs)
     return _orig_to_csv(self, path_or_buf, *args, **kwargs)
 pd.DataFrame.to_csv = _safe_to_csv
 # =====================================================================
@@ -67,7 +72,6 @@ warnings.filterwarnings("ignore")
 PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(PIPELINE_DIR, "config.yaml")
 
-# Timestamped log filename
 log_filename = f"pipeline_run_{time.strftime('%Y%m%d_%H%M%S')}.log"
 
 logging.basicConfig(
@@ -81,9 +85,6 @@ def load_config():
     with open(CONFIG_PATH, "r") as f:
         config = yaml.safe_load(f)
         
-    # --- BULLETPROOF S3 PATH INJECTOR ---
-    # Intercepts the config and forces the s3:// protocol onto all paths 
-    # so Pandas knows to stream from the correct folder in DagsHub.
     for key, value in config['paths'].items():
         if isinstance(value, str):
             if value.startswith("truestates-ml-ops/"):
@@ -129,7 +130,6 @@ def run_full_dubai_pipeline(steps_to_run=None):
         logger.info(f"--- [STEP {i}/{len(steps)}]: {step_name} ---")
         run_stage(step_name, config)
 
-    # --- Auto-Sync Log to DagsHub via DVC ---
     logger.info("Syncing logs to DagsHub...")
     subprocess.run(["dvc", "add", log_filename], check=True)
     subprocess.run(["dvc", "push", f"{log_filename}.dvc", "-r", "origin"], check=True)
