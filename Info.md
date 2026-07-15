@@ -91,3 +91,34 @@ git push
 
 - **MLflow experiments**: go to your DagsHub repo → Experiments tab, or open `https://dagshub.com/poojariprakash88/truestates-ml-ops.mlflow` directly to see params, metrics, drift flags, and artifacts per run. [dagshub](https://dagshub.com/DAGsHub-Official/dagshub-docs/src/636d68aa5ede5e94f44963855716a33bb6bf59ad/docs/integration_guide/giskard.md)
 - **DVC pipeline graph**: DagsHub repo → Data Pipeline tab visualizes the `dvc.yaml` DAG with tracked outputs per stage. [dagshub](https://dagshub.com/docs/integration_guide/dvc/)
+
+
+
+
+
+
+
+
+
+####################################################################################################################################################################3
+
+cd C:\Users\pooja\truestates-ml-ops
+
+python -m dvc destroy -f
+python -m dvc init
+
+git clone https://dagshub.com/poojariprakash88/truestates-ml-ops.git
+cd truestates-ml-ops
+pip install -r requirements.txt
+
+python -m dvc remote add origin s3://truestates-ml-ops -f
+python -m dvc remote modify origin endpointurl https://dagshub.com/poojariprakash88/truestates-ml-ops.s3
+python -m dvc remote modify origin --local access_key_id <your_dagshub_token>
+python -m dvc remote modify origin --local secret_access_key <your_dagshub_token>
+
+python -m dvc remote default origin
+python -m dvc pull -r origin data/raw
+
+set DAGSHUB_REPO_OWNER=poojariprakash88
+set DAGSHUB_REPO_NAME=truestates-ml-ops
+set DAGSHUB_TOKEN=<your_dagshub_token>
