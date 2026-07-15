@@ -182,7 +182,7 @@ def run_cleaning_merging_stage(config):
     - Merge with micro data on transubpkey
     Implemented in transactions_data_main_parquet_yaml.py as run_merging_pipeline().
     """
-    from transactions_data_main_parquet_yaml-4 import run_merging_pipeline
+    from transactions_data_main_parquet_yaml import run_merging_pipeline
     logger.info("Running CLEANING + MERGING stage...")
     return run_merging_pipeline()
 
