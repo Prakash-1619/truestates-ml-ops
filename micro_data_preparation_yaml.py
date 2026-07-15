@@ -3,6 +3,7 @@ import os
 import time
 import yaml
 import re
+import posixpath # <-- ADD THIS
 from dagshub import get_repo_bucket_client
 
 # Initialize DagsHub client globally for this script
@@ -13,14 +14,16 @@ def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
         
-    # Construct absolute paths (Strip s3:// prefix for DagsHub client)
-    base = config['paths']['raw_dir'].replace("s3://", "")
+    # Grab the root base directory (strips 's3://' to get "truestates-ml-ops/data")
+    base = config['paths']['base_dir'].replace("s3://", "")
     
+    # These are the files this specific script needs to load/save
     path_keys = ['projects_file', 'developers_file', 'buildings_file', 'units_file', 'ingestion_output']
+    
     for key in path_keys:
         if key in config['paths']:
-            # Use forward slashes for S3 paths instead of os.path.join
-            config['paths'][key] = f"{base}/{config['paths'][key]}"
+            # Seamlessly joins "truestates-ml-ops/data" + "raw/projects.parquet"
+            config['paths'][key] = posixpath.join(base, config['paths'][key])
             
     return config
 
