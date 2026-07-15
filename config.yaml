@@ -17,35 +17,21 @@
 #   s3_bucket: "truestates-ml-ops" #/s3:/truestates-ml-ops
 #   s3_raw_prefix: "raw"
 paths:
-  # Base directories mapped to your DagsHub S3 bucket
   base_dir: "s3://truestates-ml-ops/data/raw"
   processed_dir: "s3://truestates-ml-ops/data/processed"
   model_requirements: "s3://truestates-ml-ops/data/model_requirements"
-  s3_bucket: "truestates-ml-ops"
-  s3_raw_prefix: "raw"
 
-  # ==========================================
-  # RAW INPUTS (Stays in base_dir)
-  # ==========================================
-  # projects_file: "projects.parquet"
-  # developers_file: "developers.parquet"
-  # buildings_file: "buildings.parquet"
-  # units_file: "units.parquet"
-  # transactions_input: "transactions.parquet"
-  # Define the full path here so the code finds exactly what it needs
-  projects_file: "s3://truestates-ml-ops/data/raw/projects.parquet"
-  developers_file: "s3://truestates-ml-ops/data/raw/developers.parquet"
-  buildings_file: "s3://truestates-ml-ops/data/raw/buildings.parquet"
-  units_file: "s3://truestates-ml-ops/data/raw/units.parquet"
-  transactions_input: "s3://truestates-ml-ops/data/raw/transactions.parquet"
-  
+  # Raw parquet/xlsx (will be routed to data/raw by load_config)
+  projects_file: "projects.parquet"
+  developers_file: "developers.parquet"
+  buildings_file: "buildings.parquet"
+  units_file: "units.parquet"
+  transactions_input: "transactions.parquet"
   project_grade: "project_scorecard.xlsx"
   dev_grade: "developer_scorecard.xlsx"
   bld_grade: "Dubai_RE_Classification_DLD.xlsx"
 
-  # ==========================================
-  # PROCESSED (Escapes raw to save in processed)
-  # ==========================================
+  # Processed outputs (will be routed to data/processed)
   ingestion_output: "../processed/latest_pdbu_df.csv"
   transactions_output: "../processed/unit_res_trans_16.parquet"
   merging_input_trans: "../processed/unit_res_trans_16.parquet"
@@ -59,9 +45,7 @@ paths:
   forecast_metadata: "../processed/forecasting_metadata.csv"
   chronos_backtest_output: "../processed/chronos_backtest_metrics.csv"
 
-  # ==========================================
-  # MODEL REQUIREMENTS (Artifacts & Forecasts)
-  # ==========================================
+  # Model artifacts (routed to data/model_requirements)
   models_dir: "../model_requirements/models"
   columns_dir: "../model_requirements/trained_columns"
   ranges_file: "../model_requirements/input_ranges.csv"
@@ -71,18 +55,14 @@ paths:
   chronos_historic_output: "../model_requirements/chronos_historical_baseline.csv"
   adjusted_forecast_output: "../model_requirements/adjusted_macro_forecast.csv"
 
-  # ==========================================
-  # UTILS (JSONs remain untouched)
-  # ==========================================
+  # Utils
   area_sens_path: "utils/area_sensitivity.json"
   entity_tiers_path: "utils/entity_tiers.json"
   event_scales_path: "utils/event_scale_bins.json"
   event_to_channel_path: "utils/event_to_channel.json"
   geo_relevance_path: "utils/geo_relevance.json"
   news_context_file: "news_context.json"
-  
 
-  # Archive
   old_files_dir: "old_files"
 
 # ==============================================================================
