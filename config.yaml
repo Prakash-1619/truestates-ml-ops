@@ -8,13 +8,16 @@
 #   dvc remote modify origin endpointurl https://dagshub.com/poojariprakash88/truestates-ml-ops.s3
 #   dvc remote modify origin --local access_key_id  <dagshub_token>
 #   dvc remote modify origin --local secret_access_key <dagshub_token>
+# ==============================================================================
+# GLOBAL PATH CONFIGURATION
+# ==============================================================================
 paths:
-  base_dir: "data/raw"          # local working copy tracked by DVC, pulled from s3://truestates-ml-ops/raw # data/
-  processed_dir: "data/processed" # data/
+  base_dir: "data/raw"
+  processed_dir: "data/processed"
   s3_bucket: "s3://truestates-ml-ops"
   s3_raw_prefix: "raw"
 
-  # Ingestion (DVC-tracked raw inputs -> s3://truestates-ml-ops/raw/*)
+  # Ingestion
   projects_file: "projects.parquet"
   developers_file: "developers.parquet"
   buildings_file: "buildings.parquet"
@@ -31,7 +34,7 @@ paths:
   merging_output: "latest_combined_data.parquet"
   outliers_metadata: "metadata_outliers_cleaning.csv"
 
-  # Excel Scorecard Files (raw bucket)
+  # Excel Scorecard Files
   project_grade: "project_scorecard.xlsx"
   dev_grade: "developer_scorecard.xlsx"
   bld_grade: "Dubai_RE_Classification_DLD.xlsx"
@@ -88,6 +91,311 @@ drift:
   model_metric_key: "r2"
   metric_drift_threshold_pct: 0.10
 
+# ==============================================================================
+# INGESTION SETTINGS
+# ==============================================================================
+ingestion_columns:
+  projects:
+    - project_id
+    - project_number
+    - developer_id
+    - developer_number
+    - master_developer_id
+    - master_project_ar
+    - project_start_date
+    - project_end_date
+    - completion_date
+    - cancellation_date
+    - property_id
+    - area_id
+    - area_name_en
+    - master_project_en
+    - zoning_authority_en
+    - no_of_lands
+    - no_of_buildings
+    - no_of_villas
+    - no_of_units
+
+  developers:
+    - developer_id
+    - developer_number
+    - developer_name_en
+    - registration_date
+
+  buildings:
+    - property_id
+    - area_id
+    - zone_id
+    - area_name_en
+    - land_number
+    - land_sub_number
+    - building_number
+    - common_area
+    - actual_common_area
+    - floors
+    - rooms
+    - rooms_en
+    - built_up_area
+    - bld_levels
+    - swimming_pools
+    - elevators
+    - actual_area
+    - property_type_id
+    - property_type_en
+    - property_sub_type_id
+    - property_sub_type_en
+    - parent_property_id
+    - creation_date
+    - project_id
+    - project_name_en
+    - land_type_id
+    - land_type_en
+
+ingestion_processing:
+  date_columns:
+    - project_start_date
+    - project_end_date
+    - completion_date
+    - cancellation_date
+    - registration_date
+
+  drop_columns:
+    - zone_id
+    - land_sub_number
+    - common_area
+    - actual_common_area
+    - rooms
+    - land_type_id
+
+# ==============================================================================
+# TRANSACTION SETTINGS
+# ==============================================================================
+transaction_settings:
+  start_filter_date: "2010-01-01"
+  exclude_group:
+    - "Gifts"
+    - "Mortgages"
+  property_usage: "Residential"
+  property_type: "Unit"
+  date_format: "%d-%m-%Y"
+
+# ==============================================================================
+# MERGING SETTINGS
+# ==============================================================================
+merging_params:
+  exclude_rooms:
+    - "Office"
+    - "Shop"
+    - "Single Room"
+    - "0"
+    - "No_rooms_en"
+    - "Missing_rooms_en"
+
+# ==============================================================================
+# REGRESSION MODEL SETTINGS
+# ==============================================================================
+model_params:
+  n_estimators: 300
+  random_state: 42
+  n_jobs: -1
+  test_size: 0.2
+
+training_columns:
+  cat_cols:
+    - trans_group_en
+    - rooms_en
+    - reg_type_en
+    - floor_bin
+    - Grade
+    - project_grade
+    - Developer_grade
+    - Developer Reputation Tier
+    - Locality Zone
+    - Price Tier
+    - Developer Tier
+    - Reputation
+
+  num_cols:
+    - has_parking
+    - swimming_pool
+    - balcony
+    - elevators
+    - metro
+    - procedure_area
+    - Score
+    - year
+    - month
+
+training_logic:
+  start_date: "2020-01-01"
+  target_col: "meter_sale_price"
+  trans_group_filter:
+    - "Sales"
+  min_samples_to_train: 30
+  special_areas:
+    - "Wadi Al Safa 3"
+  default_quantiles:
+    - 0.25
+    - 0.75
+  special_quantiles:
+    - 0.30
+    - 0.65
+
+# ==============================================================================
+# MARKET MAPPINGS
+# ==============================================================================
+market_mappings:
+  direct_areas:
+    - "Al Barsha South Fourth"
+    - "Business Bay"
+    - "Al Merkadh"
+    - "Burj Khalifa"
+    - "Hadaeq Sheikh Mohammed Bin Rashid"
+    - "Al Khairan First"
+    - "Wadi Al Safa 5"
+    - "Al Thanyah Fifth"
+    - "Al Barshaa South Third"
+    - "Jabal Ali First"
+    - "Madinat Al Mataar"
+    - "Madinat Dubai Almelaheyah"
+    - "Me'Aisem First"
+    - "Al Hebiah Fourth"
+    - "Al Barsha South Fifth"
+    - "Al Hebiah First"
+    - "Nadd Hessa"
+    - "Palm Jumeirah"
+    - "Al Barshaa South Second"
+    - "Al Yelayiss 2"
+    - "Al Warsan First"
+    - "Marsa Dubai"
+
+  groups:
+    G1:
+      - "Wadi Al Safa 4"
+      - "Al Kifaf"
+    G2:
+      - "Dubai Investment Park First"
+      - "Wadi Al Safa 7"
+    G3:
+      - "Warsan Fourth"
+      - "Jabal Ali"
+    G4:
+      - "Zaabeel Second"
+      - "Zaabeel First"
+    G5:
+      - "Saih Shuaib 2"
+      - "Nad Al Shiba First"
+
+  proxies:
+    Proxy1:
+      - "Al Barsha South Fourth"
+      - "Al Barshaa South Third"
+      - "Al Yelayiss 2"
+    Proxy2:
+      - "Bukadra"
+      - "Madinat Dubai Almelaheyah"
+    Proxy3:
+      - "Jabal Ali First"
+      - "Me'Aisem First"
+
+# ==============================================================================
+# FORECASTING SETTINGS
+# ==============================================================================
+forecast_settings:
+  train_until: "2026-05-31"
+  forecast_steps: 6
+  test_months: 6
+  base_date_gf: "2026-05-31"
+  seasonal_period: 12
+
+forecasting_settings:
+  prediction_points: 6
+  backtest_periods: 6
+  forecast_start_month: null
+
+# ==============================================================================
+# ARCHIVE SETTINGS
+# ==============================================================================
+archive:
+  enabled: true
+  folder_name: "old_files"
+  prefix: "old_"
+
+# ==============================================================================
+# MACRO-NEWS IMPACT SETTINGS
+# ==============================================================================
+macro_news_settings:
+  llm_api_url: "http://localhost:11434/api/generate"
+  llm_model: "gpt-oss:120b-cloud"
+  projection_months_ahead: 6
+
+# ==============================================================================
+# AREA MAPPING FOR MACRO-NEWS PIPELINE
+# ==============================================================================
+area_mapping:
+  "Al Barsha First": 368
+  "Al Barsha South Fifth": 442
+  "Al Barsha South Fourth": 441
+  "Al Barshaa South Second": 414
+  "Al Barshaa South Third": 409
+  "Al Goze Fourth": 348
+  "Al Hebiah Fifth": 451
+  "Al Hebiah First": 444
+  "Al Hebiah Fourth": 435
+  "Al Hebiah Second": 452
+  "Al Hebiah Sixth": 531
+  "Al Hebiah Third": 523
+  "Al Jadaf": 334
+  "Al Khairan First": 447
+  "Al Kheeran": 437
+  "Al Kifaf": 366
+  "Al Merkadh": 412
+  "Al Safouh First": 307
+  "Al Safouh Second": 371
+  "Al Thanyah Fifth": 350
+  "Al Thanyah First": 443
+  "Al Thanyah Third": 351
+  "Al Warsan First": 343
+  "Al Wasl": 364
+  "Al Yelayiss 2": 507
+  "Burj Khalifa": 390
+  "Business Bay": 526
+  "Dubai Investment Park First": 458
+  "Dubai Investment Park Second": 459
+  "Hadaeq Sheikh Mohammed Bin Rashid": 482
+  "Hessyan First": 522
+  "Island 2": 527
+  "Jabal Ali First": 445
+  "Jabal Ali Industrial Second": 478
+  "Jumeirah First": 317
+  "Madinat Al Mataar": 462
+  "Madinat Dubai Almelaheyah": 333
+  "Madinat Hind 4": 505
+  "Marsa Dubai": 330
+  "Me'Aisem First": 485
+  "Mirdif": 232
+  "Muhaisanah First": 312
+  "Nad Al Shiba First": 335
+  "Nadd Hessa": 484
+  "Palm Jumeirah": 410
+  "Rega Al Buteen": 255
+  "Saih Shuaib 2": 453
+  "Trade Center Second": 329
+  "Um Hurair Second": 326
+  "Um Suqaim Third": 370
+  "Wadi Al Safa 2": 464
+  "Wadi Al Safa 3": 465
+  "Wadi Al Safa 5": 467
+  "Wadi Al Safa 7": 463
+  "Warsan Fourth": 483
+  "Zaabeel Second": 332
+  "grouped1": 366
+  "grouped2": 483
+  "grouped3": 332
+  "proxy1": 441
+  "proxy2": 333
+  "proxy3": 485
+  
 # ==============================================================================
 # (rest of settings identical to your original config — ingestion_columns,
 #  transaction_settings, merging_params, model_params, training_columns,
