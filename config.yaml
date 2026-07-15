@@ -18,6 +18,7 @@
 #   s3_raw_prefix: "raw"
 paths:
   # Base directories for S3 streaming
+  base_dir: "s3://truestates-ml-ops/data/raw"
   raw_dir: "s3://truestates-ml-ops/data/raw"
   processed_dir: "s3://truestates-ml-ops/data/processed"
   model_requirements: "s3://truestates-ml-ops/data/model_requirements"
