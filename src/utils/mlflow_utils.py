@@ -8,7 +8,7 @@ import mlflow
 import dagshub
 
 def init_mlflow(experiment_name: str):
-    repo_owner = os.environ.get("DAGSHUB_REPO_OWNER", "AnanthS")
+    repo_owner = os.environ.get("DAGSHUB_REPO_OWNER", "poojariprakash88")
     repo_name = os.environ.get("DAGSHUB_REPO_NAME", "truestates-ml-ops")
 
     # dagshub.init wires MLFLOW_TRACKING_URI + auth automatically.
