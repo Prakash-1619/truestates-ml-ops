@@ -18,51 +18,51 @@
 #   s3_raw_prefix: "raw"
 paths:
   # Base directories for S3 streaming
-  base_dir: "s3://truestates-ml-ops/data/raw"
+  base_dir: "s3://truestates-ml-ops/data"
   raw_dir: "s3://truestates-ml-ops/data/raw"
   processed_dir: "s3://truestates-ml-ops/data/processed"
   model_requirements: "s3://truestates-ml-ops/data/model_requirements"
 
   # Ingestion
-  projects_file: "projects.parquet"
-  developers_file: "developers.parquet"
-  buildings_file: "buildings.parquet"
-  units_file: "units.parquet"
-  ingestion_output: "latest_pdbu_df.csv"
+  projects_file: "raw/projects.parquet"
+  developers_file: "raw/developers.parquet"
+  buildings_file: "raw/buildings.parquet"
+  units_file: "raw/units.parquet"
+  ingestion_output: "processed/latest_pdbu_df.csv"
 
   # Transaction Processing
-  transactions_input: "transactions.parquet"
-  transactions_output: "unit_res_trans_16.parquet"
+  transactions_input: "raw/transactions.parquet"
+  transactions_output: "processed/unit_res_trans_16.parquet"
 
   # Merging
-  merging_input_trans: "unit_res_trans_16.parquet"
-  merging_input_micro: "latest_pdbu_df.csv"
-  merging_output: "latest_combined_data.parquet"
-  outliers_metadata: "metadata_outliers_cleaning.csv"
+  merging_input_trans: "processed/unit_res_trans_16.parquet"
+  merging_input_micro: "processed/latest_pdbu_df.csv"
+  merging_output: "processed/latest_combined_data.parquet"
+  outliers_metadata: "processed/metadata_outliers_cleaning.csv"
 
   # Excel Scorecard Files
-  project_grade: "project_scorecard.xlsx"
-  dev_grade: "developer_scorecard.xlsx"
-  bld_grade: "Dubai_RE_Classification_DLD.xlsx"
+  project_grade: "raw/project_scorecard.xlsx"
+  dev_grade: "raw/developer_scorecard.xlsx"
+  bld_grade: "raw/Dubai_RE_Classification_DLD.xlsx"
 
   # Regression Model
-  model_input: "latest_combined_data.parquet"
-  models_dir: "models"
-  columns_dir: "trained_columns"
-  metrics_file: "all_area_metrics.csv"
-  ranges_file: "input_ranges.csv"
+  model_input: "processed/latest_combined_data.parquet"
+  models_dir: "model_requirements/models"
+  columns_dir: "model_requirements/trained_columns"
+  metrics_file: "processed/all_area_metrics.csv"
+  ranges_file: "model_requirements/input_ranges.csv"
 
   # Market Forecasting
-  forecast_input: "unit_res_trans_16.parquet"
-  historic_output: "historic_df.csv"
-  growth_output: "forecast_df.csv"
-  forecast_metadata: "forecasting_metadata.csv"
+  forecast_input: "processed/unit_res_trans_16.parquet"
+  historic_output: "model_requirements/historic_df.csv"
+  growth_output: "model_requirements/forecast_df.csv"
+  forecast_metadata: "processed/forecasting_metadata.csv"
 
   # Chronos Forecasting
-  chronos_input: "unit_res_trans_16.parquet"
-  chronos_output: "final_chronos_forecasts.csv"
-  chronos_backtest_output: "chronos_backtest_metrics.csv"
-  chronos_historic_output: "chronos_historical_baseline.csv"
+  chronos_input: "processed/unit_res_trans_16.parquet"
+  chronos_output: "model_requirements/final_chronos_forecasts.csv"
+  chronos_backtest_output: "processed/chronos_backtest_metrics.csv"
+  chronos_historic_output: "model_requirements/chronos_historical_baseline.csv"
 
   # Macro-News Impact Pipeline
   area_sens_path: "utils/area_sensitivity.json"
@@ -70,12 +70,12 @@ paths:
   event_scales_path: "utils/event_scale_bins.json"
   event_to_channel_path: "utils/event_to_channel.json"
   geo_relevance_path: "utils/geo_relevance.json"
-  adjusted_forecast_output: "adjusted_macro_forecast.csv"
+  adjusted_forecast_output: "model_requirements/adjusted_macro_forecast.csv"
   news_context_file: "news_context.json"
 
   # Archive
   old_files_dir: "old_files"
-
+  
 # ==============================================================================
 # MLFLOW / DAGSHUB TRACKING
 # ==============================================================================
