@@ -38,7 +38,7 @@ def load_config():
         return yaml.safe_load(f)
 
 STAGE_MODULES = {
-    "Ingestion": "src.ingestion.run",
+    #"Ingestion": "src.ingestion.run",
     "Cleaning": "src.cleaning.run",
     "Merging": "src.merging.run",
     "Modeling": "src.modeling.run",
