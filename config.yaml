@@ -71,7 +71,7 @@ paths:
 # MLFLOW / DAGSHUB TRACKING
 # ==============================================================================
 mlflow:
-  repo_owner: "AnanthS"
+  repo_owner: "poojariprakash88"
   repo_name: "truestates-ml-ops"
   experiment_ingestion: "Ingestion"
   experiment_cleaning: "Cleaning"
