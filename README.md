@@ -43,7 +43,7 @@ main.py
 ## 2. One-time setup
 
 ```bash
-git clone https://dagshub.com/AnanthS/truestates-ml-ops.git
+git clone https://dagshub.com/poojariprakash88/truestates-ml-ops.git
 cd truestates-ml-ops
 pip install -r requirements.txt
 
