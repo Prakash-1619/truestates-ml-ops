@@ -168,9 +168,9 @@ def load_config():
 def run_ingestion_stage(config):
     """
     Ingestion: projects + developers + buildings + units -> latest_pdbu_df.csv
-    Implemented in micro_data_preparation_yaml-12.py as run_ingestion(config).
+    Implemented in micro_data_preparation_yaml.py as run_ingestion(config).
     """
-    from micro_data_preparation_yaml-12 import run_ingestion
+    from micro_data_preparation_yaml import run_ingestion
     logger.info("Running INGESTION stage...")
     return run_ingestion(config)
 
@@ -180,7 +180,7 @@ def run_cleaning_merging_stage(config):
     Cleaning & Merging:
     - Clean raw transactions (parquet)
     - Merge with micro data on transubpkey
-    Implemented in transactions_data_main_parquet_yaml-4.py as run_merging_pipeline().
+    Implemented in transactions_data_main_parquet_yaml.py as run_merging_pipeline().
     """
     from transactions_data_main_parquet_yaml-4 import run_merging_pipeline
     logger.info("Running CLEANING + MERGING stage...")
@@ -202,9 +202,9 @@ def run_forecasting_stage(config):
     """
     Forecasting:
     - Chronos-based forecasting on monthly aggregated data
-    Implemented in forecasting_engine_chronos-9.py as execute_pipeline_entry(config).
+    Implemented in forecasting_engine_chronos.py as execute_pipeline_entry(config).
     """
-    from forecasting_engine_chronos-9 import execute_pipeline_entry
+    from forecasting_engine_chronos import execute_pipeline_entry
     logger.info("Running FORECASTING stage...")
     return execute_pipeline_entry(config)
 
