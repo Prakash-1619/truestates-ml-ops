@@ -11,11 +11,16 @@
 # ==============================================================================
 # GLOBAL PATH CONFIGURATION
 # ==============================================================================
+# paths:
+#   base_dir: "data/raw"
+#   processed_dir: "data/processed"
+#   s3_bucket: "truestates-ml-ops" #/s3:/truestates-ml-ops
+#   s3_raw_prefix: "raw"
 paths:
-  base_dir: "data/raw"
-  processed_dir: "data/processed"
-  s3_bucket: "truestates-ml-ops" #/s3:/truestates-ml-ops
-  s3_raw_prefix: "raw"
+  # Base directories for S3 streaming
+  raw_dir: "s3://truestates-ml-ops/data/raw"
+  processed_dir: "s3://truestates-ml-ops/data/processed"
+  model_requirements: "s3://truestates-ml-ops/data/model_requirements"
 
   # Ingestion
   projects_file: "projects.parquet"
