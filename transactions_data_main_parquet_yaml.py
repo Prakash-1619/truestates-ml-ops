@@ -2,6 +2,10 @@ import pandas as pd
 import os
 import yaml
 import time
+from dagshub import get_repo_bucket_client
+
+# Initialize DagsHub client globally
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
 
 # Set global engine preference
 pd.set_option('io.parquet.engine', 'pyarrow')
@@ -11,12 +15,15 @@ def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
         
-    # Resolve absolute paths from the compiled config structure
-    base = config['paths']['base_dir']
-    config['paths']['trans_in'] = os.path.join(base, config['paths']['transactions_input'])
-    config['paths']['trans_out'] = os.path.join(base, config['paths']['transactions_output'])
+    # Grab the root base directory (strips 's3://')
+    base = config['paths']['base_dir'].replace("s3://", "")
+    
+    # Attach base to the specific files this script needs
+    config['paths']['trans_in'] = f"{base}/{config['paths']['transactions_input']}"
+    config['paths']['trans_out'] = f"{base}/{config['paths']['transactions_output']}"
+    
     return config
-
+    
 def process_transaction_data(config):
     """
     Loads, cleans, and transforms transaction data based on config settings.
@@ -26,7 +33,10 @@ def process_transaction_data(config):
     # 1. Load Data
     input_path = config['paths']['trans_in']
     print(f"⏳ Loading: {input_path}")
-    df = pd.read_parquet(input_path)
+    
+    with fs.open(input_path, "rb") as f:
+        df = pd.read_parquet(f)
+        
     print(f"Initial shape: {df.shape}")
 
     # 2. Date Conversion & Filtering
@@ -100,9 +110,9 @@ def process_transaction_data(config):
 
     # 6. Export as PARQUET
     output_path = config['paths']['trans_out']
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    df_res_unit.to_parquet(output_path, engine='pyarrow', index=False)
+    with fs.open(output_path, "wb") as f:
+        df_res_unit.to_parquet(f, engine='pyarrow', index=False)
     
     duration = time.time() - start_time
     print(f"✅ Processed {len(df_res_unit)} rows in {duration:.2f}s")
