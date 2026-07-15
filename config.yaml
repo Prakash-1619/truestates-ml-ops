@@ -27,11 +27,18 @@ paths:
   # ==========================================
   # RAW INPUTS (Stays in base_dir)
   # ==========================================
-  projects_file: "projects.parquet"
-  developers_file: "developers.parquet"
-  buildings_file: "buildings.parquet"
-  units_file: "units.parquet"
-  transactions_input: "transactions.parquet"
+  # projects_file: "projects.parquet"
+  # developers_file: "developers.parquet"
+  # buildings_file: "buildings.parquet"
+  # units_file: "units.parquet"
+  # transactions_input: "transactions.parquet"
+  # Define the full path here so the code finds exactly what it needs
+  projects_file: "s3://truestates-ml-ops/data/raw/projects.parquet"
+  developers_file: "s3://truestates-ml-ops/data/raw/developers.parquet"
+  buildings_file: "s3://truestates-ml-ops/data/raw/buildings.parquet"
+  units_file: "s3://truestates-ml-ops/data/raw/units.parquet"
+  transactions_input: "s3://truestates-ml-ops/data/raw/transactions.parquet"
+  
   project_grade: "project_scorecard.xlsx"
   dev_grade: "developer_scorecard.xlsx"
   bld_grade: "Dubai_RE_Classification_DLD.xlsx"
