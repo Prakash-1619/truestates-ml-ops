@@ -14,7 +14,7 @@
 paths:
   base_dir: "data/raw"
   processed_dir: "data/processed"
-  s3_bucket: "s3://truestates-ml-ops"
+  s3_bucket: "truestates-ml-ops/s3://truestates-ml-ops"
   s3_raw_prefix: "raw"
 
   # Ingestion
