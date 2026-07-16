@@ -252,7 +252,10 @@ class DubaiPropertyForecaster:
         logger.info("Preparing uniform monthly grid for Chronos...")
         grid_df = monthly_df[monthly_df['month'] >= '2010-01-01'].copy()
         grid_df = grid_df.drop_duplicates(subset=['model_area_id', 'month'])
-        grid_df = grid_df.set_index('month').groupby('model_area_id').resample('MS').asfreq().reset_index()
+        # Resample the grid
+        grid_df = grid_df.set_index('month').groupby('model_area_id').resample('MS').asfreq()
+        # Drop the duplicate column before resetting the index to prevent Pandas 2.2+ ValueError
+        grid_df = grid_df.drop(columns=['model_area_id'], errors='ignore').reset_index()
         grid_df = grid_df.sort_values(['model_area_id', 'month'])
 
         feature_cols = [c for c in grid_df.columns if c not in ['area_id', 'model_area_id', 'month', 'area_name_en', 'actual_area_id', 'log_price', 'future_log_return_1m']]
