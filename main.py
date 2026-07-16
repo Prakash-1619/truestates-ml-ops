@@ -41,7 +41,7 @@ STAGE_MODULES = {
     #"Ingestion": "src.ingestion.run",
     #"Cleaning": "src.cleaning.run",
     #"Merging": "src.merging.run",
-    "Modeling": "src.modeling.run",
+    #"Modeling": "src.modeling.run",
     "Forecasting": "src.forecasting.run",
     "Forecasting_news": "src.forecasting_news.run",
 }
