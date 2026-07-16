@@ -23,10 +23,15 @@ def ensure_old_dir(base_dir, config):
     return old_dir
 
 def archive_existing_file(file_path, old_dir, prefix="old_"):
-    if fs.exists(file_path):
-        filename = file_path.split('/')[-1]
-        archived_path = f"{old_dir}/{prefix}{filename}"
-        fs.rename(file_path, archived_path)
+    try:
+        if fs.exists(file_path):
+            filename = file_path.split('/')[-1]
+            archived_path = f"{old_dir}/{prefix}{filename}"
+            fs.rename(file_path, archived_path)
+    except Exception as e:
+        # DagsHub S3 CopyObject occasionally throws 500 errors. 
+        # Safely catch it and proceed to overwrite the file natively.
+        logger.warning(f"⚠️ S3 Archive skipped for {file_path}. Safe to overwrite. (Backend Error: {e})")
 
 class DubaiPropertyForecaster:
     def __init__(self, model_name="amazon/chronos-2", prediction_length=6, backtest_periods=6, zero_threshold=0.90):
