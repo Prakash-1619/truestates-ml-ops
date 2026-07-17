@@ -331,7 +331,8 @@ archive:
 # MACRO-NEWS IMPACT SETTINGS
 # ==============================================================================
 macro_news_settings:
-  llm_api_url: "http://localhost:11434/api/generate"
+  # llm_api_url: "http://localhost:11434/api/generate"
+  llm_api_url: "http://51.38.112.237:11434/api/generate"
   llm_model: "gpt-oss:120b-cloud"
   projection_months_ahead: 6
 
