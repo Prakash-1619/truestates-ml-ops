@@ -30,11 +30,15 @@ def ensure_old_dir(base_dir, config):
     return f"{base_dir}/{folder}"
 
 def archive_existing_file(file_path, old_dir, prefix="old_"):
-    if fs.exists(file_path):
-        filename = file_path.split('/')[-1]
-        archived_path = f"{old_dir}/{prefix}{filename}"
-        fs.rename(file_path, archived_path)
-
+    try:
+        if fs.exists(file_path):
+            filename = file_path.split('/')[-1]
+            archived_path = f"{old_dir}/{prefix}{filename}"
+            fs.rename(file_path, archived_path)
+    except Exception as e:
+        # This catches the DagsHub/S3 500 error gracefully
+        logger.warning(f"⚠️ S3 Archive skipped. Proceeding with overwrite. ({e})")
+        
 def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
