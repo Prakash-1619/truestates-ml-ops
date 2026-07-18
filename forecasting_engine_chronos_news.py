@@ -17,7 +17,7 @@ fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = "config_og.yaml"
+CONFIG_PATH = "config.yaml"
 
 RSS_FEEDS = {
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
