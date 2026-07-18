@@ -4,11 +4,6 @@ Runs: Ingestion -> Cleaning -> Merging -> Modeling -> Forecasting -> Forecasting
 Each stage wrapper (src/<stage>/run.py) handles its own MLflow run + DVC-tracked outputs.
 """
 import os
-# Fix: Windows CP1252 can't encode MLflow emoji → UnicodeEncodeError.
-if hasattr(sys.stdout, "buffer") and (not sys.stdout.encoding or sys.stdout.encoding.lower() != "utf-8"):
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 import sys
 import time
 import logging
@@ -16,7 +11,11 @@ import yaml
 import warnings
 import subprocess
 import s3fs # Required for s3:// protocol streaming
-
+# Fix: Windows CP1252 can't encode MLflow emoji → UnicodeEncodeError.
+if hasattr(sys.stdout, "buffer") and (not sys.stdout.encoding or sys.stdout.encoding.lower() != "utf-8"):
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # --- DagsHub Authentication ---
 # token = "8df26f9f871b7249cc698426d87853f4ea3d8655"
