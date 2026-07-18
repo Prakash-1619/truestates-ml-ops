@@ -4,7 +4,11 @@ Runs: Ingestion -> Cleaning -> Merging -> Modeling -> Forecasting -> Forecasting
 Each stage wrapper (src/<stage>/run.py) handles its own MLflow run + DVC-tracked outputs.
 """
 import os
-print(f"DEBUG: Current directory is {os.getcwd()}")
+# Fix: Windows CP1252 can't encode MLflow emoji → UnicodeEncodeError.
+if hasattr(sys.stdout, "buffer") and (not sys.stdout.encoding or sys.stdout.encoding.lower() != "utf-8"):
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 import sys
 import time
 import logging
@@ -13,8 +17,10 @@ import warnings
 import subprocess
 import s3fs # Required for s3:// protocol streaming
 
+
 # --- DagsHub Authentication ---
-token = "8df26f9f871b7249cc698426d87853f4ea3d8655"
+# token = "8df26f9f871b7249cc698426d87853f4ea3d8655"
+token = os.environ.get("DAGSHUB_TOKEN", "8df26f9f871b7249cc698426d87853f4ea3d8655")
 os.environ["AWS_ACCESS_KEY_ID"] = token
 os.environ["AWS_SECRET_ACCESS_KEY"] = token
 os.environ["AWS_ENDPOINT_URL_S3"] = "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"
@@ -67,12 +73,13 @@ def run_full_dubai_pipeline(steps_to_run=None):
     # --- Auto-Sync Log to DagsHub via DVC ---
     logger.info("Syncing logs to DagsHub...")
     try:
-        subprocess.run(["dvc", "add", log_filename], check=True)
+        dvc_cmd = [sys.executable, "-m", "dvc"]  # python -m dvc works even if dvc not on PATH
+        subprocess.run(dvc_cmd + ["add", log_filename], check=True)
+        subprocess.run(dvc_cmd + ["push", f"{log_filename}.dvc", "-r", "origin"], check=True)
+        logger.info(f"PIPELINE COMPLETE. Log synced to DagsHub as {log_filename}")
     except Exception as e:
-        logger.warning(f"⚠️ DVC tracking for log file failed, but pipeline finished successfully. ({e})")
-    subprocess.run(["dvc", "push", f"{log_filename}.dvc", "-r", "origin"], check=True)
-    
-    logger.info(f"PIPELINE COMPLETE. Log saved as {log_filename}")
+        logger.warning(f"DVC log sync skipped (non-critical): {e}")
+        logger.info(f"PIPELINE COMPLETE. Log saved locally as {log_filename}")
 
 if __name__ == "__main__":
     run_full_dubai_pipeline()
