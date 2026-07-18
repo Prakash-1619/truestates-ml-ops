@@ -4,6 +4,7 @@ Runs: Ingestion -> Cleaning -> Merging -> Modeling -> Forecasting -> Forecasting
 Each stage wrapper (src/<stage>/run.py) handles its own MLflow run + DVC-tracked outputs.
 """
 import os
+print(f"DEBUG: Current directory is {os.getcwd()}")
 import sys
 import time
 import logging
@@ -65,7 +66,10 @@ def run_full_dubai_pipeline(steps_to_run=None):
 
     # --- Auto-Sync Log to DagsHub via DVC ---
     logger.info("Syncing logs to DagsHub...")
-    subprocess.run(["dvc", "add", log_filename], check=True)
+    try:
+        subprocess.run(["dvc", "add", log_filename], check=True)
+    except Exception as e:
+        logger.warning(f"⚠️ DVC tracking for log file failed, but pipeline finished successfully. ({e})")
     subprocess.run(["dvc", "push", f"{log_filename}.dvc", "-r", "origin"], check=True)
     
     logger.info(f"PIPELINE COMPLETE. Log saved as {log_filename}")
