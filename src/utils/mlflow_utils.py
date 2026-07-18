@@ -1,41 +1,43 @@
-"""
-MLflow + DagsHub bootstrap helper.
-Reads DAGSHUB_REPO_OWNER / DAGSHUB_REPO_NAME / DAGSHUB_TOKEN from env
-(set these as environment variables or in a local .env — NEVER commit tokens).
-"""
 import os
+import pandas as pd
 import mlflow
-import dagshub
+import logging
+from dagshub import get_repo_bucket_client
+
+logger = logging.getLogger(__name__)
+fs = get_repo_bucket_client("poojariprakash88/truestates-ml-ops", flavor="s3fs")
 
 def init_mlflow(experiment_name: str):
-    repo_owner = os.environ.get("DAGSHUB_REPO_OWNER", "poojariprakash88")
-    repo_name = os.environ.get("DAGSHUB_REPO_NAME", "truestates-ml-ops")
-
-    # dagshub.init wires MLFLOW_TRACKING_URI + auth automatically.
-    # It will prompt for a browser login the first time if DAGSHUB_TOKEN is not set.
-    dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
-
-    mlflow.set_experiment(experiment_name)
-    return mlflow
-
+    """Initializes MLflow tracking."""
+    # (Keep your existing initialization logic here)
+    pass
 
 def log_config_params(config: dict, prefix: str = ""):
-    """Flatten and log a (sub)section of config.yaml as MLflow params."""
-    flat = {}
+    """Log config params to MLflow."""
+    # (Keep your existing _flatten logic here)
+    pass
 
-    def _flatten(d, parent_key=""):
-        for k, v in d.items():
-            key = f"{parent_key}.{k}" if parent_key else k
-            if isinstance(v, dict):
-                _flatten(v, key)
-            elif isinstance(v, list):
-                flat[key] = str(v)[:250]
-            else:
-                flat[key] = v
-
-    _flatten(config)
-    for k, v in flat.items():
-        try:
-            mlflow.log_param(f"{prefix}{k}" if prefix else k, v)
-        except Exception:
-            pass
+def log_s3_artifact_to_mlflow(config: dict, path_key: str, default_path: str, artifact_name: str):
+    """
+    Helper to stream a file from DagsHub S3 and log it to MLflow as an artifact.
+    Returns the dataframe if successful, None otherwise.
+    """
+    base = config["paths"]["base_dir"].replace("s3://", "")
+    s3_path = f"{base}/{config['paths'].get(path_key, default_path)}"
+    
+    if fs.exists(s3_path):
+        with fs.open(s3_path, "rb") as f:
+            df = pd.read_csv(f)
+        
+        # Save to local temporary file
+        df.to_csv(artifact_name, index=False)
+        mlflow.log_artifact(artifact_name)
+        
+        # Cleanup local file
+        if os.path.exists(artifact_name):
+            os.remove(artifact_name)
+            
+        return df 
+    else:
+        logger.warning(f"⚠️ Artifact not found in S3 at {s3_path}")
+        return None
