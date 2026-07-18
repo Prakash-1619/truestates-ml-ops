@@ -933,11 +933,36 @@ def execute_pipeline_entry(config=None):
     )
     area_to_id_mapping = dict(zip(area_to_id_mapping["area"], area_to_id_mapping["area_id"]))
 
-    final_df = run_market_forecasting_pipeline(test_df, area_to_id_mapping)
-    # Wrap the CSV write
-    with fs.open(output_file, "w") as f:
-        final_df.to_csv(f, index=False)
+    # final_df = run_market_forecasting_pipeline(test_df, area_to_id_mapping)
+    # # Wrap the CSV write
+    # with fs.open(output_file, "w") as f:
+    #     final_df.to_csv(f, index=False)
         
+    # logger.info(f"Adjusted macro forecast saved to: {output_file}")
+
+    final_df = run_market_forecasting_pipeline(test_df, area_to_id_mapping)
+
+    # Sanitise LLM-generated Unicode that Windows CP1252 can't encode
+    def _clean_str(val):
+        if isinstance(val, str):
+            return (val
+                    .replace('\u202f', ' ')   # narrow no-break space
+                    .replace('\u00a0', ' ')   # non-breaking space
+                    .replace('\u2019', "'")   # right single quotation mark
+                    .replace('\u2018', "'")   # left single quotation mark
+                    .replace('\u201c', '"')   # left double quotation mark
+                    .replace('\u201d', '"')   # right double quotation mark
+                    .replace('\u2013', '-')   # en-dash
+                    .replace('\u2014', '-'))  # em-dash
+        return val
+
+    for col in final_df.select_dtypes(include='object').columns:
+        final_df[col] = final_df[col].map(_clean_str)
+
+    # Write as binary UTF-8 to avoid Windows CP1252 encoding errors
+    with fs.open(output_file, "wb") as f:
+        f.write(final_df.to_csv(index=False).encode('utf-8'))
+
     logger.info(f"Adjusted macro forecast saved to: {output_file}")
     return final_df
 
