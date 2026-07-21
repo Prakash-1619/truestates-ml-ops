@@ -20,6 +20,11 @@ if hasattr(sys.stdout, "buffer") and (not sys.stdout.encoding or sys.stdout.enco
 # --- DagsHub Authentication ---
 # token = "8df26f9f871b7249cc698426d87853f4ea3d8655"
 token = os.environ.get("DAGSHUB_TOKEN", "8df26f9f871b7249cc698426d87853f4ea3d8655")
+repo_owner = os.environ.get("DAGSHUB_REPO_OWNER", "poojariprakash88")
+repo_name = os.environ.get("DAGSHUB_REPO_NAME", "truestates-ml-ops")
+os.environ.setdefault("DAGSHUB_TOKEN", token)
+os.environ.setdefault("DAGSHUB_REPO_OWNER", repo_owner)
+os.environ.setdefault("DAGSHUB_REPO_NAME", repo_name)
 os.environ["AWS_ACCESS_KEY_ID"] = token
 os.environ["AWS_SECRET_ACCESS_KEY"] = token
 os.environ["AWS_ENDPOINT_URL_S3"] = "https://dagshub.com/poojariprakash88/truestates-ml-ops.s3"
