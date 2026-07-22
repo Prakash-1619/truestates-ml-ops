@@ -1,5 +1,6 @@
 paths:
   project_root: /home/ubuntu/Dubai/truestates-ml-ops
+  base_dir: /home/ubuntu/Dubai
   data_dir: /home/ubuntu/Dubai/data
   raw_dir: /home/ubuntu/Dubai/data/raw
   processed_dir: /home/ubuntu/Dubai/data/processed
