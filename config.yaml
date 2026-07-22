@@ -238,6 +238,8 @@ training_logic:
   trans_group_filter:
     - "Sales"
   min_samples_to_train: 30
+  area_filter:
+    - "Business Bay"
   special_areas:
     - "Wadi Al Safa 3"
   default_quantiles:

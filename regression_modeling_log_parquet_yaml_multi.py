@@ -25,6 +25,35 @@ logger = logging.getLogger(__name__)
 
 pd.set_option('io.parquet.engine', 'pyarrow')
 
+
+def _to_local_path(path: str) -> str:
+    if not path or not path.startswith('s3://'):
+        return path
+    remainder = path[len('s3://'):]
+    if '/' in remainder:
+        _, _, rel_path = remainder.partition('/')
+        return os.path.join(os.getcwd(), rel_path)
+    return os.path.join(os.getcwd(), remainder)
+
+
+def _write_output(path: str, writer, mode: str = 'wb'):
+    try:
+        with fs.open(path, mode) as f:
+            writer(f)
+        return path
+    except Exception as exc:
+        local_path = _to_local_path(path)
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        if mode == 'w':
+            with open(local_path, mode, encoding='utf-8', newline='') as f:
+                writer(f)
+        else:
+            with open(local_path, mode) as f:
+                writer(f)
+        logger.warning(f"⚠️ S3 write failed for {path}; saved locally at {local_path}. ({exc})")
+        return local_path
+
+
 def ensure_old_dir(base_dir, config):
     folder = config.get('archive', {}).get('folder_name', 'old_files')
     return f"{base_dir}/{folder}"
@@ -218,10 +247,8 @@ def train_and_save(name, area_df, target, config, cat_cols, num_cols, date_col='
 
         final_cols = list(X_train_raw.columns) if best_area_metrics['best_algorithm'] == 'CatBoost' else list(X_train_enc.columns)
 
-        with fs.open(model_filepath, "wb") as f:
-            joblib.dump(best_area_model, f)
-        with fs.open(cols_filepath, "wb") as f:
-            joblib.dump(final_cols, f)
+        _write_output(model_filepath, lambda f: joblib.dump(best_area_model, f), mode='wb')
+        _write_output(cols_filepath, lambda f: joblib.dump(final_cols, f), mode='wb')
 
     return best_area_metrics, summary_dict, param_logs
 
@@ -274,14 +301,27 @@ def run_model_training():
     mapping_proxies = market_mappings.get('proxies', {})
     combined_mappings = {**mapping_groups, **mapping_proxies}
 
-    min_samples = config.get('training_logic', {}).get('min_samples_to_train', 30)
-    area_counts = df_raw['area_name_en'].value_counts()
-    individual_areas_to_run = area_counts[area_counts >= 6000].index.tolist()
+    training_logic = config.get('training_logic', {})
+    min_samples = training_logic.get('min_samples_to_train', 30)
+    area_filter = training_logic.get('area_filter') or training_logic.get('single_area')
+    if area_filter:
+        if isinstance(area_filter, str):
+            areas_to_run = [area_filter]
+        else:
+            areas_to_run = list(area_filter)
+        areas_to_run = [a for a in areas_to_run if a in df_raw['area_name_en'].unique()]
+        if not areas_to_run:
+            logger.error("❌ No matching areas found for the configured area_filter.")
+            return
+        logger.info(f"🎯 Restricting training to configured area(s): {areas_to_run}")
+    else:
+        area_counts = df_raw['area_name_en'].value_counts()
+        areas_to_run = area_counts[area_counts >= 6000].index.tolist()
 
     best_results, summaries, all_param_logs = [], [], []
 
-    logger.info(f"--- 🚀 Starting Individual Area Models ({len(individual_areas_to_run)} total) ---")
-    for area in individual_areas_to_run:
+    logger.info(f"--- 🚀 Starting Individual Area Models ({len(areas_to_run)} total) ---")
+    for area in areas_to_run:
         area_df = df_raw[df_raw['area_name_en'] == area]
 
         if len(area_df) > min_samples:
@@ -297,21 +337,24 @@ def run_model_training():
         else:
             logger.warning(f"⚠️ Skipped {area}: Insufficient train data ({len(area_df)} rows)")
 
-    logger.info(f"--- 🚀 Starting Combined Models ({len(combined_mappings)} total) ---")
-    for combined_name, combined_area_list in combined_mappings.items():
-        area_df = df_raw[df_raw['area_name_en'].isin(combined_area_list)]
+    if area_filter:
+        logger.info("⏭️ Skipping combined-model training because an area_filter is configured.")
+    else:
+        logger.info(f"--- 🚀 Starting Combined Models ({len(combined_mappings)} total) ---")
+        for combined_name, combined_area_list in combined_mappings.items():
+            area_df = df_raw[df_raw['area_name_en'].isin(combined_area_list)]
 
-        if len(area_df) > min_samples:
-            metrics, summary, params = train_and_save(combined_name, area_df.copy(), target_col, config, cat_cols, num_cols, date_col)
-            if metrics:
-                best_results.append(metrics)
-                summaries.append(summary)
-                all_param_logs.extend(params)
+            if len(area_df) > min_samples:
+                metrics, summary, params = train_and_save(combined_name, area_df.copy(), target_col, config, cat_cols, num_cols, date_col)
+                if metrics:
+                    best_results.append(metrics)
+                    summaries.append(summary)
+                    all_param_logs.extend(params)
 
-                shape_str = str(metrics.get('train_shape', 'N/A'))
-                logger.info(f"🏆 {combined_name:20} | Shape: {shape_str:10} | Algo: {metrics.get('best_algorithm', 'N/A'):10} | R2: {metrics.get('test_r2', 0):5.2f} | MAPE: {metrics.get('test_mape', 0):6.2%} | MAE: {metrics.get('test_mae', 0):,.0f} | RMSE: {metrics.get('test_rmse', 0):,.0f}")
-        else:
-            logger.warning(f"⚠️ Skipped {combined_name}: Insufficient train data ({len(area_df)} rows)")
+                    shape_str = str(metrics.get('train_shape', 'N/A'))
+                    logger.info(f"🏆 {combined_name:20} | Shape: {shape_str:10} | Algo: {metrics.get('best_algorithm', 'N/A'):10} | R2: {metrics.get('test_r2', 0):5.2f} | MAPE: {metrics.get('test_mape', 0):6.2%} | MAE: {metrics.get('test_mae', 0):,.0f} | RMSE: {metrics.get('test_rmse', 0):,.0f}")
+            else:
+                logger.warning(f"⚠️ Skipped {combined_name}: Insufficient train data ({len(area_df)} rows)")
 
     base = config['paths']['base_dir']
     metrics_path = config['paths'].get('metrics_path') or os.path.join(base, config['paths'].get('metrics_file', 'best_model_metrics.csv'))
@@ -326,12 +369,9 @@ def run_model_training():
     archive_existing_file(params_path, old_dir, prefix)
 
     if best_results:
-        with fs.open(metrics_path, "w") as f:
-            pd.DataFrame(best_results).to_csv(f, index=False)
-        with fs.open(ranges_path, "w") as f:
-            pd.DataFrame(summaries).to_csv(f, index=False)
-        with fs.open(params_path, "w") as f:
-            pd.DataFrame(all_param_logs).to_csv(f, index=False)
+        _write_output(metrics_path, lambda f: pd.DataFrame(best_results).to_csv(f, index=False), mode='w')
+        _write_output(ranges_path, lambda f: pd.DataFrame(summaries).to_csv(f, index=False), mode='w')
+        _write_output(params_path, lambda f: pd.DataFrame(all_param_logs).to_csv(f, index=False), mode='w')
         logger.info("🎉 Training Complete. All metrics and tuning logs saved to base directory.")
     else:
         logger.error("❌ No models were successfully trained.")

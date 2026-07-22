@@ -20,6 +20,41 @@ from src.utils.mlflow_utils import init_mlflow, log_config_params
 
 logger = logging.getLogger(__name__)
 
+
+def _to_local_path(path: str) -> str:
+    if not path or not path.startswith('s3://'):
+        return path
+    remainder = path[len('s3://'):]
+    if '/' in remainder:
+        _, _, rel_path = remainder.partition('/')
+        return os.path.join(os.getcwd(), rel_path)
+    return os.path.join(os.getcwd(), remainder)
+
+
+def _resolve_existing_path(path: str) -> str:
+    if not path:
+        return path
+    try:
+        if fs.exists(path):
+            return path
+    except Exception:
+        pass
+    local_path = _to_local_path(path)
+    if os.path.exists(local_path):
+        return local_path
+    return local_path
+
+
+def _open_existing_path(path: str, mode: str):
+    if path.startswith('s3://'):
+        try:
+            return fs.open(path, mode)
+        except Exception:
+            local_path = _to_local_path(path)
+            return open(local_path, mode)
+    return open(path, mode)
+
+
 def run(config: dict):
     init_mlflow(config["mlflow"]["experiment_forecasting"])
     with mlflow.start_run(run_name="forecasting_chronos"):
@@ -32,14 +67,16 @@ def run(config: dict):
         duration = time.time() - t0
         mlflow.log_metric("forecasting_duration_sec", duration)
 
-        # 2. Form S3 paths natively
-        base = config["paths"]["base_dir"].replace("s3://", "")
+        # 2. Resolve forecast output paths with local fallback
+        base = config["paths"]["base_dir"]
         out_path = f"{base}/{config['paths']['chronos_output']}"
         backtest_path = f"{base}/{config['paths']['chronos_backtest_output']}"
+        out_path = _resolve_existing_path(out_path)
+        backtest_path = _resolve_existing_path(backtest_path)
 
         # 3. Log Forecast CSV Artifact
-        if fs.exists(out_path):
-            with fs.open(out_path, "rb") as f:
+        if os.path.exists(out_path) or fs.exists(out_path):
+            with _open_existing_path(out_path, "rb") as f:
                 forecast_df = pd.read_csv(f)
             # Save temporarily to upload to MLflow
             forecast_df.to_csv("final_chronos_forecasts.csv", index=False)
@@ -48,8 +85,8 @@ def run(config: dict):
             logger.warning(f"⚠️ Forecast file not found in S3 at {out_path}")
 
         # 4. Log Area-Wise Backtest Metrics
-        if fs.exists(backtest_path):
-            with fs.open(backtest_path, "rb") as f:
+        if os.path.exists(backtest_path) or fs.exists(backtest_path):
+            with _open_existing_path(backtest_path, "rb") as f:
                 bt_df = pd.read_csv(f)
             
             # Save temporarily to upload to MLflow

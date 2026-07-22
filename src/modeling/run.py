@@ -19,6 +19,41 @@ from src.utils.drift_utils import check_model_drift
 
 logger = logging.getLogger(__name__)
 
+
+def _to_local_path(path: str) -> str:
+    if not path or not path.startswith('s3://'):
+        return path
+    remainder = path[len('s3://'):]
+    if '/' in remainder:
+        _, _, rel_path = remainder.partition('/')
+        return os.path.join(os.getcwd(), rel_path)
+    return os.path.join(os.getcwd(), remainder)
+
+
+def _resolve_existing_path(path: str) -> str:
+    if not path:
+        return path
+    try:
+        if fs.exists(path):
+            return path
+    except Exception:
+        pass
+    local_path = _to_local_path(path)
+    if os.path.exists(local_path):
+        return local_path
+    return local_path
+
+
+def _open_existing_path(path: str, mode: str):
+    if path.startswith('s3://'):
+        try:
+            return fs.open(path, mode)
+        except Exception:
+            local_path = _to_local_path(path)
+            return open(local_path, mode)
+    return open(path, mode)
+
+
 # Numeric metric columns produced by regression_modeling_log_parquet_yaml_multi
 AREA_METRIC_COLS = [
     'test_r2', 'test_mape', 'test_mae', 'test_rmse',
@@ -45,16 +80,18 @@ def run(config: dict):
         duration = time.time() - t0
         mlflow.log_metric("modeling_duration_sec", duration)
 
-        # 2. Construct S3 paths natively
-        base = config["paths"]["base_dir"].replace("s3://", "")
+        # 2. Resolve metrics and params paths, preferring local fallback when S3 is unavailable
+        base = config["paths"]["base_dir"]
         metrics_path = f"{base}/{config['paths'].get('metrics_file', 'processed/all_area_metrics.csv')}"
         params_path = f"{base}/{config['paths'].get('params_file', 'model_requirements/all_param_logs.csv')}"
+        metrics_path = _resolve_existing_path(metrics_path)
+        params_path = _resolve_existing_path(params_path)
 
         agg_metrics = {}
 
         # 3. Log ALL AREA METRICS to MLflow
-        if fs.exists(metrics_path):
-            with fs.open(metrics_path, "rb") as f:
+        if os.path.exists(metrics_path) or fs.exists(metrics_path):
+            with _open_existing_path(metrics_path, "rb") as f:
                 metrics_df = pd.read_csv(f)
 
             # Upload full CSV as artifact (visible in MLflow dashboard)
@@ -88,8 +125,8 @@ def run(config: dict):
             logger.warning(f"Metrics file not found in S3 at {metrics_path}")
 
         # 4. Log ALL AREA PARAMETERS to MLflow
-        if fs.exists(params_path):
-            with fs.open(params_path, "rb") as f:
+        if os.path.exists(params_path) or fs.exists(params_path):
+            with _open_existing_path(params_path, "rb") as f:
                 params_df = pd.read_csv(f)
 
             params_df.to_csv("all_param_logs.csv", index=False)
