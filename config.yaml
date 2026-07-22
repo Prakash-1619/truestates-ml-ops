@@ -1,0 +1,134 @@
+paths:
+  project_root: .
+  data_dir: data
+  raw_dir: data/raw
+  processed_dir: data/processed
+  utils_dir: data/utils
+  model_requirements_dir: data/model_requirements
+  models_dir: data/model_requirements/models
+  columns_dir: data/model_requirements/trained_columns
+
+  projects_file: data/raw/projects.parquet
+  developers_file: data/raw/developers.parquet
+  buildings_file: data/raw/buildings.parquet
+  units_file: data/raw/units.parquet
+  transactions_input: data/raw/transactions.parquet
+  project_grade: data/raw/project_scorecard.xlsx
+  dev_grade: data/raw/developer_scorecard.xlsx
+  bld_grade: data/raw/Dubai_RE_Classification_DLD.xlsx
+
+  ingestion_output: data/processed/latest_pdbu_df.csv
+  transactions_output: data/processed/unit_res_trans_16.parquet
+  merging_input_trans: data/processed/unit_res_trans_16.parquet
+  merging_input_micro: data/processed/latest_pdbu_df.csv
+  merging_output: data/processed/latest_combined_data.parquet
+  outliers_metadata: data/processed/metadata_outliers_cleaning.csv
+  model_input: data/processed/latest_combined_data.parquet
+  metrics_file: data/processed/all_area_metrics.csv
+  ranges_file: data/model_requirements/input_ranges.csv
+  forecast_input: data/processed/unit_res_trans_16.parquet
+  historic_output: data/processed/historic_df.csv
+  growth_output: data/processed/forecast_df.csv
+  forecast_metadata: data/processed/forecasting_metadata.csv
+  chronos_input: data/processed/unit_res_trans_16.parquet
+  chronos_output: data/model_requirements/final_chronos_forecasts.csv
+  chronos_backtest_output: data/processed/chronos_backtest_metrics.csv
+  chronos_historic_output: data/model_requirements/chronos_historical_baseline.csv
+  area_sens_path: data/utils/area_sensitivity.json
+  entity_tiers_path: data/utils/entity_tiers.json
+  event_scales_path: data/utils/event_scale_bins.json
+  event_to_channel_path: data/utils/event_to_channel.json
+  geo_relevance_path: data/utils/geo_relevance.json
+  adjusted_forecast_output: data/model_requirements/adjusted_macro_forecast.csv
+  news_context_file: data/utils/news_context.json
+  parameter_tuning_log: data/parameter_tuning_log.csv
+
+mlflow:
+  tracking_uri: http://51.38.112.237:5001
+  experiment_name: truestates-ml-ops
+
+ingestion_columns:
+  projects:
+    - project_id
+    - project_number
+    - developer_id
+    - developer_number
+    - master_developer_id
+    - master_project_ar
+    - project_start_date
+    - project_end_date
+    - completion_date
+    - cancellation_date
+    - property_id
+    - area_id
+    - area_name_en
+    - master_project_en
+    - zoning_authority_en
+    - no_of_lands
+    - no_of_buildings
+    - no_of_villas
+    - no_of_units
+  developers:
+    - developer_id
+    - developer_number
+    - developer_name_en
+    - registration_date
+  buildings:
+    - property_id
+    - area_id
+    - zone_id
+    - area_name_en
+    - land_number
+    - land_sub_number
+    - building_number
+    - common_area
+    - actual_common_area
+    - floors
+    - rooms
+    - rooms_en
+    - built_up_area
+    - bld_levels
+    - swimming_pools
+    - elevators
+    - actual_area
+    - property_type_id
+    - property_type_en
+    - property_sub_type_id
+    - property_sub_type_en
+    - parent_property_id
+    - creation_date
+    - project_id
+    - project_name_en
+    - land_type_id
+    - land_type_en
+
+ingestion_processing:
+  date_columns:
+    - project_start_date
+    - project_end_date
+    - completion_date
+    - cancellation_date
+    - registration_date
+  drop_columns:
+    - zone_id
+    - land_sub_number
+    - common_area
+    - actual_common_area
+    - rooms
+    - land_type_id
+
+transaction_settings:
+  start_filter_date: '2010-01-01'
+  exclude_group: ['Gifts', 'Mortgages']
+  property_usage: Residential
+  property_type: Unit
+  date_format: '%d-%m-%Y'
+
+merging_params:
+  exclude_rooms: ['Office', 'Shop', 'Single Room', '0', 'No_rooms_en', 'Missing_rooms_en']
+
+model_params:
+  n_estimators: 300
+  random_state: 42
+  n_jobs: -1
+  test_size: 0.2

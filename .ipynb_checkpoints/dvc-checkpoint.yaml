@@ -1,0 +1,54 @@
+stages:
+  ingestion:
+    cmd: python micro_data_preparation_yaml.py
+    deps:
+      - micro_data_preparation_yaml.py
+      - config.yaml
+    outs:
+      - data/processed/latest_pdbu_df.csv
+
+  cleaning:
+    cmd: python transactions_data_main_parquet_yaml.py
+    deps:
+      - transactions_data_main_parquet_yaml.py
+      - config.yaml
+      - data/raw/transactions.parquet
+    outs:
+      - data/processed/unit_res_trans_16.parquet
+
+  merging:
+    cmd: python transactions_data_preparation_mode_parquet_yaml.py
+    deps:
+      - transactions_data_preparation_mode_parquet_yaml.py
+      - config.yaml
+      - data/processed/latest_pdbu_df.csv
+      - data/processed/unit_res_trans_16.parquet
+    outs:
+      - data/processed/latest_combined_data.parquet
+
+  modeling:
+    cmd: python regression_modeling_log_parquet_yaml_multi.py
+    deps:
+      - regression_modeling_log_parquet_yaml_multi.py
+      - config.yaml
+      - data/processed/latest_combined_data.parquet
+    outs:
+      - data/model_requirements
+
+  forecasting:
+    cmd: python forecasting_engine_chronos.py
+    deps:
+      - forecasting_engine_chronos.py
+      - config.yaml
+      - data/processed/unit_res_trans_16.parquet
+    outs:
+      - data/model_requirements/final_chronos_forecasts.csv
+
+  forecasting_news:
+    cmd: python forecasting_engine_chronos_news.py
+    deps:
+      - forecasting_engine_chronos_news.py
+      - config.yaml
+      - data/model_requirements/final_chronos_forecasts.csv
+    outs:
+      - data/model_requirements/adjusted_macro_forecast.csv
