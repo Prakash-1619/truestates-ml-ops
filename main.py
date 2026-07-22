@@ -47,13 +47,26 @@ def run_step(step_name, config):
     raise AttributeError(f"No callable entrypoint found in module {info['module']}")
 
 def ensure_directories(config):
-    for key in ['data_dir', 'raw_dir', 'processed_dir', 'utils_dir', 'model_requirements_dir', 'models_dir', 'columns_dir']:
+    required = [
+        'base_dir', 'data_dir', 'raw_dir', 'processed_dir',
+        'utils_dir', 'model_requirements_dir', 'models_dir', 'columns_dir'
+    ]
+    for key in required:
+        if key not in config['paths']:
+            raise KeyError(f"Missing key in config.yaml: 'paths.{key}'")
         Path(config['paths'][key]).mkdir(parents=True, exist_ok=True)
 
 def run_full_dubai_pipeline(steps_to_run=None):
     config = load_config()
     ensure_directories(config)
-    steps_to_run = steps_to_run or ['Ingestion', 'Cleaning', 'Merging']
+    steps_to_run = steps_to_run or [
+        'Ingestion',
+        'Cleaning',
+        'Merging',
+        'Modeling',
+        'Forecasting',
+        'Forecasting_news'
+    ]
     start = time.time()
     logger.info('=' * 60)
     logger.info('TRUESTATES ML OPS PIPELINE STARTING')
