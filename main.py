@@ -5,18 +5,21 @@ import time
 from pathlib import Path
 import warnings
 import yaml
+import mlflow  # <-- 1. Added MLflow import
 
 warnings.filterwarnings('ignore')
+
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / 'config.yaml'
+
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler(ROOT / 'pipeline_run.log', mode='w'), logging.StreamHandler(sys.stdout)],
-)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[logging.FileHandler(ROOT / 'pipeline_run.log', mode='w'),
+                              logging.StreamHandler(sys.stdout)],
+                    )
 logger = logging.getLogger(__name__)
 
 MODULE_MAP = {
@@ -47,10 +50,7 @@ def run_step(step_name, config):
     raise AttributeError(f"No callable entrypoint found in module {info['module']}")
 
 def ensure_directories(config):
-    required = [
-        'base_dir', 'data_dir', 'raw_dir', 'processed_dir',
-        'utils_dir', 'model_requirements_dir', 'models_dir', 'columns_dir'
-    ]
+    required = ['base_dir', 'data_dir', 'raw_dir', 'processed_dir', 'utils_dir', 'model_requirements_dir', 'models_dir', 'columns_dir']
     for key in required:
         if key not in config['paths']:
             raise KeyError(f"Missing key in config.yaml: 'paths.{key}'")
@@ -59,23 +59,33 @@ def ensure_directories(config):
 def run_full_dubai_pipeline(steps_to_run=None):
     config = load_config()
     ensure_directories(config)
-    steps_to_run = steps_to_run or [
-        'Ingestion',
-        'Cleaning',
-        'Merging',
-        'Modeling',
-        'Forecasting',
-        'Forecasting_news'
-    ]
+
+    # <-- 2. Setup MLflow centrally using config.yaml -->
+    mlflow_cfg = config.get('mlflow', {})
+    if mlflow_cfg.get('tracking_uri'):
+        mlflow.set_tracking_uri(mlflow_cfg['tracking_uri'])
+        mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
+
+    steps_to_run = steps_to_run or ['Ingestion', 'Cleaning', 'Merging', 'Modeling', 'Forecasting', 'Forecasting_news']
+
     start = time.time()
     logger.info('=' * 60)
     logger.info('TRUESTATES ML OPS PIPELINE STARTING')
     logger.info('=' * 60)
-    for idx, step_name in enumerate(steps_to_run, 1):
-        step_start = time.time()
-        logger.info('--- [STEP %s / %s]: %s ---', idx, len(steps_to_run), step_name)
-        run_step(step_name, config)
-        logger.info('Completed %s in %.2f s', step_name, time.time() - step_start)
+
+    # <-- 3. Create a Parent run for the entire pipeline execution -->
+    with mlflow.start_run(run_name="full_pipeline_run"):
+        for idx, step_name in enumerate(steps_to_run, 1):
+            step_start = time.time()
+            logger.info('--- [STEP %s / %s]: %s ---', idx, len(steps_to_run), step_name)
+
+            # <-- 4. Create a nested Child run for each specific stage -->
+            with mlflow.start_run(run_name=f"stage_{step_name.lower()}", nested=True):
+                mlflow.log_param("stage", step_name)
+                run_step(step_name, config)
+
+            logger.info('Completed %s in %.2f s', step_name, time.time() - step_start)
+
     logger.info('Pipeline complete in %.2f minutes', (time.time() - start) / 60)
 
 if __name__ == '__main__':

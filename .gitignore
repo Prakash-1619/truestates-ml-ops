@@ -5,3 +5,5 @@ venv/
 mlruns/
 .dvc/cache/
 *.log
+data/
+gitlab-runner-*.deb
