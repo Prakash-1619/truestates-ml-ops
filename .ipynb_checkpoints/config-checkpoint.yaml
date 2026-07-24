@@ -1,51 +1,56 @@
+# ==============================================================================
+# INGESTION SETTINGS
+# ==============================================================================
 paths:
-  project_root: Dubai
-  data_dir: Dubai/data
-  raw_dir: Dubai/data/raw
-  processed_dir: Dubai/data/processed
-  utils_dir: Dubai/data/utils
-  model_requirements_dir: Dubai/data/model_requirements
-  models_dir: Dubai/data/model_requirements/models
-  columns_dir: Dubai/data/model_requirements/trained_columns
+  project_root: /home/ubuntu/Dubai/truestates-ml-ops4
+  base_dir: /home/ubuntu/Dubai/
+  data_dir: /home/ubuntu/Dubai/data
+  raw_dir: /home/ubuntu/Dubai/data/raw
+  processed_dir: /home/ubuntu/Dubai/data/processed
+  utils_dir: /home/ubuntu/Dubai/data/utils
+  model_requirements_dir: /home/ubuntu/Dubai/data/model_requirements
+  models_dir: /home/ubuntu/Dubai/data/model_requirements/models
+  columns_dir: /home/ubuntu/Dubai/data/model_requirements/trained_columns
 
-  projects_file: Dubai/data/raw/projects.parquet
-  developers_file: Dubai/data/raw/developers.parquet
-  buildings_file: Dubai/data/raw/buildings.parquet
-  units_file: Dubai/data/raw/units.parquet
-  transactions_input: Dubai/data/raw/transactions.parquet
-  project_grade: Dubai/data/raw/project_scorecard.xlsx
-  dev_grade: Dubai/data/raw/developer_scorecard.xlsx
-  bld_grade: Dubai/data/raw/Dubai_RE_Classification_DLD.xlsx
+  projects_file: /home/ubuntu/Dubai/data/raw/projects.parquet
+  developers_file: /home/ubuntu/Dubai/data/raw/developers.parquet
+  buildings_file: /home/ubuntu/Dubai/data/raw/buildings.parquet
+  units_file: /home/ubuntu/Dubai/data/raw/units.parquet
+  transactions_input: /home/ubuntu/Dubai/data/raw/transactions.parquet
+  project_grade: /home/ubuntu/Dubai/data/raw/project_scorecard.xlsx
+  dev_grade: /home/ubuntu/Dubai/data/raw/developer_scorecard.xlsx
+  bld_grade: /home/ubuntu/Dubai/data/raw/Dubai_RE_Classification_DLD.xlsx
 
-  ingestion_output: Dubai/data/processed/latest_pdbu_df.csv
-  transactions_output: Dubai/data/processed/unit_res_trans_16.parquet
-  merging_input_trans: Dubai/data/processed/unit_res_trans_16.parquet
-  merging_input_micro: Dubai/data/processed/latest_pdbu_df.csv
-  merging_output: Dubai/data/processed/latest_combined_data.parquet
-  outliers_metadata: Dubai/data/processed/metadata_outliers_cleaning.csv
-  model_input: Dubai/data/processed/latest_combined_data.parquet
-  metrics_file: Dubai/data/processed/all_area_metrics.csv
-  ranges_file: Dubai/data/model_requirements/input_ranges.csv
-  forecast_input: Dubai/data/processed/unit_res_trans_16.parquet
-  historic_output: Dubai/data/processed/historic_df.csv
-  growth_output: Dubai/data/processed/forecast_df.csv
-  forecast_metadata: Dubai/data/processed/forecasting_metadata.csv
-  chronos_input: Dubai/data/processed/unit_res_trans_16.parquet
-  chronos_output: Dubai/data/model_requirements/final_chronos_forecasts.csv
-  chronos_backtest_output: Dubai/data/processed/chronos_backtest_metrics.csv
-  chronos_historic_output: Dubai/data/model_requirements/chronos_historical_baseline.csv
-  area_sens_path: Dubai/data/utils/area_sensitivity.json
-  entity_tiers_path: Dubai/data/utils/entity_tiers.json
-  event_scales_path: Dubai/data/utils/event_scale_bins.json
-  event_to_channel_path: Dubai/data/utils/event_to_channel.json
-  geo_relevance_path: Dubai/data/utils/geo_relevance.json
-  adjusted_forecast_output: Dubai/data/model_requirements/adjusted_macro_forecast.csv
-  news_context_file: Dubai/data/utils/news_context.json
-  parameter_tuning_log: Dubai/data/parameter_tuning_log.csv
+  ingestion_output: /home/ubuntu/Dubai/data/processed/latest_pdbu_df.csv
+  transactions_output: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
+  merging_input_trans: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
+  merging_input_micro: /home/ubuntu/Dubai/data/processed/latest_pdbu_df.csv
+  merging_output: /home/ubuntu/Dubai/data/processed/latest_combined_data.parquet
+  outliers_metadata: /home/ubuntu/Dubai/data/processed/metadata_outliers_cleaning.csv
+  model_input: /home/ubuntu/Dubai/data/processed/latest_combined_data.parquet
+  metrics_file: /home/ubuntu/Dubai/data/processed/all_area_metrics.csv
+  ranges_file: /home/ubuntu/Dubai/data/model_requirements/input_ranges.csv
+  forecast_input: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
+  historic_output: /home/ubuntu/Dubai/data/processed/historic_df.csv
+  growth_output: /home/ubuntu/Dubai/data/processed/forecast_df.csv
+  forecast_metadata: /home/ubuntu/Dubai/data/processed/forecasting_metadata.csv
+  chronos_input: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
+  chronos_output: /home/ubuntu/Dubai/data/model_requirements/final_chronos_forecasts.csv
+  chronos_backtest_output: /home/ubuntu/Dubai/data/processed/chronos_backtest_metrics.csv
+  chronos_historic_output: /home/ubuntu/Dubai/data/model_requirements/chronos_historical_baseline.csv
+  area_sens_path: /home/ubuntu/Dubai/data/utils/area_sensitivity.json
+  entity_tiers_path: /home/ubuntu/Dubai/data/utils/entity_tiers.json
+  event_scales_path: /home/ubuntu/Dubai/data/utils/event_scale_bins.json
+  event_to_channel_path: /home/ubuntu/Dubai/data/utils/event_to_channel.json
+  geo_relevance_path: /home/ubuntu/Dubai/data/utils/geo_relevance.json
+  adjusted_forecast_output: /home/ubuntu/Dubai/data/model_requirements/adjusted_macro_forecast.csv
+  news_context_file: /home/ubuntu/Dubai/data/utils/news_context.json
+  parameter_tuning_log: /home/ubuntu/Dubai/data/parameter_tuning_log.csv
 
 mlflow:
   tracking_uri: http://51.38.112.237:5001
   experiment_name: truestates-ml-ops
+
 
 ingestion_columns:
   projects:
@@ -68,11 +73,13 @@ ingestion_columns:
     - no_of_buildings
     - no_of_villas
     - no_of_units
+
   developers:
     - developer_id
     - developer_number
     - developer_name_en
     - registration_date
+
   buildings:
     - property_id
     - area_id
@@ -109,6 +116,7 @@ ingestion_processing:
     - completion_date
     - cancellation_date
     - registration_date
+
   drop_columns:
     - zone_id
     - land_sub_number
@@ -117,6 +125,35 @@ ingestion_processing:
     - rooms
     - land_type_id
 
+
+# ==============================================================================
+# TRANSACTION SETTINGS
+# ==============================================================================
+transaction_settings:
+  start_filter_date: "2010-01-01"
+  exclude_group:
+    - "Gifts"
+    - "Mortgages"
+  property_usage: "Residential"
+  property_type: "Unit"
+  date_format: "%d-%m-%Y"
+
+# ==============================================================================
+# MERGING SETTINGS
+# ==============================================================================
+merging_params:
+  exclude_rooms:
+    - "Office"
+    - "Shop"
+    - "Single Room"
+    - "0"
+    - "No_rooms_en"
+    - "Missing_rooms_en"
+
+# ==============================================================================
+# REGRESSION MODEL SETTINGS
+# ==============================================================================
+# =======
 transaction_settings:
   start_filter_date: '2010-01-01'
   exclude_group: ['Gifts', 'Mortgages']
@@ -127,8 +164,208 @@ transaction_settings:
 merging_params:
   exclude_rooms: ['Office', 'Shop', 'Single Room', '0', 'No_rooms_en', 'Missing_rooms_en']
 
+# >>>>>>> 5e3dcd2 (Initial project structure with local storage and MLflow)
 model_params:
   n_estimators: 300
   random_state: 42
   n_jobs: -1
   test_size: 0.2
+# <<<<<<< HEAD
+
+training_columns:
+  cat_cols:
+    - trans_group_en
+    - rooms_en
+    - reg_type_en
+    - floor_bin
+    - Grade
+    - project_grade
+    - Developer_grade
+    - Developer Reputation Tier
+    - Locality Zone
+    - Price Tier
+    - Developer Tier
+    - Reputation
+
+  num_cols:
+    - has_parking
+    - swimming_pool
+    - balcony
+    - elevators
+    - metro
+    - procedure_area
+    - Score
+    - year
+    - month
+
+training_logic:
+  start_date: "2020-01-01"
+  target_col: "meter_sale_price"
+  trans_group_filter:
+    - "Sales"
+  min_samples_to_train: 30
+  special_areas:
+    - "Wadi Al Safa 3"
+  default_quantiles:
+    - 0.25
+    - 0.75
+  special_quantiles:
+    - 0.30
+    - 0.65
+
+# ==============================================================================
+# MARKET MAPPINGS
+# ==============================================================================
+market_mappings:
+  direct_areas:
+    - "Al Barsha South Fourth"
+    - "Business Bay"
+    - "Al Merkadh"
+    - "Burj Khalifa"
+    - "Hadaeq Sheikh Mohammed Bin Rashid"
+    - "Al Khairan First"
+    - "Wadi Al Safa 5"
+    - "Al Thanyah Fifth"
+    - "Al Barshaa South Third"
+    - "Jabal Ali First"
+    - "Madinat Al Mataar"
+    - "Madinat Dubai Almelaheyah"
+    - "Me'Aisem First"
+    - "Al Hebiah Fourth"
+    - "Al Barsha South Fifth"
+    - "Al Hebiah First"
+    - "Nadd Hessa"
+    - "Palm Jumeirah"
+    - "Al Barshaa South Second"
+    - "Al Yelayiss 2"
+    - "Al Warsan First"
+    - "Marsa Dubai"
+
+  groups:
+    G1:
+      - "Wadi Al Safa 4"
+      - "Al Kifaf"
+    G2:
+      - "Dubai Investment Park First"
+      - "Wadi Al Safa 7"
+    G3:
+      - "Warsan Fourth"
+      - "Jabal Ali"
+    G4:
+      - "Zaabeel Second"
+      - "Zaabeel First"
+    G5:
+      - "Saih Shuaib 2"
+      - "Nad Al Shiba First"
+
+  proxies:
+    Proxy1:
+      - "Al Barsha South Fourth"
+      - "Al Barshaa South Third"
+      - "Al Yelayiss 2"
+    Proxy2:
+      - "Bukadra"
+      - "Madinat Dubai Almelaheyah"
+    Proxy3:
+      - "Jabal Ali First"
+      - "Me'Aisem First"
+
+# ==============================================================================
+# FORECASTING SETTINGS
+# ==============================================================================
+forecast_settings:
+  train_until: "2026-05-31"
+  forecast_steps: 6
+  test_months: 6
+  base_date_gf: "2026-05-31"
+  seasonal_period: 12
+
+forecasting_settings:
+  prediction_points: 6
+  backtest_periods: 6
+  forecast_start_month: null
+
+# ==============================================================================
+# ARCHIVE SETTINGS
+# ==============================================================================
+archive:
+  enabled: true
+  folder_name: "old_files"
+  prefix: "old_"
+
+# ==============================================================================
+# MACRO-NEWS IMPACT SETTINGS
+# ==============================================================================
+macro_news_settings:
+  # llm_api_url: "http://localhost:11434/api/generate"
+  llm_api_url: "http://51.38.112.237:11434/api/generate"
+  llm_model: "gpt-oss:120b-cloud"
+  projection_months_ahead: 6
+
+# ==============================================================================
+# AREA MAPPING FOR MACRO-NEWS PIPELINE
+# ==============================================================================
+area_mapping:
+  "Al Barsha First": 368
+  "Al Barsha South Fifth": 442
+  "Al Barsha South Fourth": 441
+  "Al Barshaa South Second": 414
+  "Al Barshaa South Third": 409
+  "Al Goze Fourth": 348
+  "Al Hebiah Fifth": 451
+  "Al Hebiah First": 444
+  "Al Hebiah Fourth": 435
+  "Al Hebiah Second": 452
+  "Al Hebiah Sixth": 531
+  "Al Hebiah Third": 523
+  "Al Jadaf": 334
+  "Al Khairan First": 447
+  "Al Kheeran": 437
+  "Al Kifaf": 366
+  "Al Merkadh": 412
+  "Al Safouh First": 307
+  "Al Safouh Second": 371
+  "Al Thanyah Fifth": 350
+  "Al Thanyah First": 443
+  "Al Thanyah Third": 351
+  "Al Warsan First": 343
+  "Al Wasl": 364
+  "Al Yelayiss 2": 507
+  "Burj Khalifa": 390
+  "Business Bay": 526
+  "Dubai Investment Park First": 458
+  "Dubai Investment Park Second": 459
+  "Hadaeq Sheikh Mohammed Bin Rashid": 482
+  "Hessyan First": 522
+  "Island 2": 527
+  "Jabal Ali First": 445
+  "Jabal Ali Industrial Second": 478
+  "Jumeirah First": 317
+  "Madinat Al Mataar": 462
+  "Madinat Dubai Almelaheyah": 333
+  "Madinat Hind 4": 505
+  "Marsa Dubai": 330
+  "Me'Aisem First": 485
+  "Mirdif": 232
+  "Muhaisanah First": 312
+  "Nad Al Shiba First": 335
+  "Nadd Hessa": 484
+  "Palm Jumeirah": 410
+  "Rega Al Buteen": 255
+  "Saih Shuaib 2": 453
+  "Trade Center Second": 329
+  "Um Hurair Second": 326
+  "Um Suqaim Third": 370
+  "Wadi Al Safa 2": 464
+  "Wadi Al Safa 3": 465
+  "Wadi Al Safa 5": 467
+  "Wadi Al Safa 7": 463
+  "Warsan Fourth": 483
+  "Zaabeel Second": 332
+  "grouped1": 366
+  "grouped2": 483
+  "grouped3": 332
+  "proxy1": 441
+  "proxy2": 333
+  "proxy3": 485
+  
