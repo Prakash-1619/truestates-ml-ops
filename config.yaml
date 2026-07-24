@@ -46,7 +46,7 @@ paths:
   parameter_tuning_log: /home/ubuntu/Dubai/data/parameter_tuning_log/home/ubuntu/Dubaicsv
 
 mlflow:
-  tracking_uri: http://51/home/ubuntu/Dubai38/home/ubuntu/Dubai112/home/ubuntu/Dubai237:5001
+  tracking_uri: http://51.38.112.237:5001/:5001
   experiment_name: truestates-ml-ops
   
 ingestion_columns:
