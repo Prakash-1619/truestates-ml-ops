@@ -245,13 +245,17 @@ class DubaiPropertyForecaster:
         logger.info("Preparing uniform monthly grid for Chronos...")
         grid_df = monthly_df[monthly_df['month'] >= '2010-01-01'].copy()
         grid_df = grid_df.drop_duplicates(subset=['model_area_id', 'month'])
-        grid_df = grid_df.set_index('month').groupby('model_area_id').resample('MS').asfreq().reset_index()
+        # Your existing line that we just fixed:
+        grid_df = grid_df.set_index('month').groupby('model_area_id').resample('MS').asfreq().drop(columns=['model_area_id'], errors='ignore').reset_index()
+        
+        # ADD THIS NEW LINE RIGHT BELOW IT:
+        grid_df = grid_df.groupby('model_area_id').filter(lambda x: len(x) >= 3)
         grid_df = grid_df.sort_values(['model_area_id', 'month'])
 
         feature_cols = [c for c in grid_df.columns if c not in ['area_id', 'model_area_id', 'month', 'area_name_en', 'actual_area_id', 'log_price', 'future_log_return_1m']]
         for col in feature_cols:
             if col in grid_df.columns:
-                grid_df[col] = grid_df.groupby('model_area_id')[col].transform(lambda x: x.interpolate(method='linear').ffill().bfill())
+                grid_df[col] = grid_df.groupby('model_area_id')[col].transform(lambda x:x.interpolate(method='linear').ffill().bfill())
 
         return grid_df.fillna(0), feature_cols
 
