@@ -7,3 +7,4 @@ mlruns/
 *.log
 data/
 gitlab-runner-*.deb
+*.deb
