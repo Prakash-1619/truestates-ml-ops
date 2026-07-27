@@ -3,6 +3,11 @@ from pathlib import Path
 import subprocess
 import yaml
 import mlflow
+import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Define root directory
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,10 +29,31 @@ def load_config():
             return yaml.safe_load(f)
     return {}
 
+def execute_cleaning_tracking(config):
+    """
+    Extracts cleaning stage metrics and metadata to track in MLflow:
+    - Cleaned dataset row count
+    - Column count
+    - Total missing values post-cleaning
+    """
+    paths = config.get('paths', {})
+    # Look for common path keys for cleaned data
+    cleaned_file = paths.get('cleaned_transactions_file') or paths.get('main_transactions_cleaned') or "data/processed/cleaned_transactions.parquet"
+    
+    cleaned_path = ROOT / cleaned_file if not Path(cleaned_file).is_absolute() else Path(cleaned_file)
+
+    if cleaned_path.exists():
+        df = pd.read_parquet(cleaned_path)
+        
+        mlflow.log_metric("cleaned_dataset_rows", len(df))
+        mlflow.log_param("cleaned_dataset_columns", len(df.columns))
+        mlflow.log_metric("total_missing_values", int(df.isna().sum().sum()))
+        
+        logger.info(f"Cleaning stage metrics logged: Rows={len(df)}, Columns={len(df.columns)}")
+
 if __name__ == '__main__':
     # Automatically determine the stage based on the parent folder name
     stage = Path(__file__).resolve().parent.name
-    
     if stage in SCRIPT_MAP:
         config = load_config()
         
@@ -35,16 +61,21 @@ if __name__ == '__main__':
         mlflow_cfg = config.get('mlflow', {})
         if mlflow_cfg.get('tracking_uri'):
             mlflow.set_tracking_uri(mlflow_cfg['tracking_uri'])
-            mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
+        mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
         
         # Execute the stage script inside an active MLflow run context
         script_path = ROOT / SCRIPT_MAP[stage]
-        
         with mlflow.start_run(run_name=f"stage_{stage}"):
             mlflow.log_param("stage", stage)
-            print(f"--- Running stage: {stage} via {script_path.name} ---")
+            logger.info(f"--- Running stage: {stage} via {script_path.name} ---")
             
-            # Execute script
+            # Execute underlying cleaning script
             subprocess.run(['python', str(script_path)], check=True)
+            
+            # Log custom cleaning metrics to MLflow
+            try:
+                execute_cleaning_tracking(config)
+            except Exception as e:
+                logger.error(f"Error logging cleaning metadata to MLflow: {e}")
     else:
-        print(f"Unknown stage directory: '{stage}'")
+        logger.warning(f"Unknown stage directory: '{stage}'")

@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 pandas>=2.0.0
 numpy>=1.26.0
 pyarrow>=14.0.0
@@ -17,3 +18,4 @@ accelerate
 gluonts
 openpyxl>=3.1.0
 chronos-forecasting
+mlflow>=2.0.0

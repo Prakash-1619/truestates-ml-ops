@@ -33,7 +33,8 @@ stages:
       - config.yaml
       - data/processed/latest_combined_data.parquet
     outs:
-      - data/model_requirements
+      - data/model_requirements/trained_models
+      - data/model_requirements/model_metrics.json
 
   forecasting:
     cmd: python forecasting_engine_chronos.py

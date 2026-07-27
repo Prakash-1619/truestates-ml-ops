@@ -1,26 +1,13 @@
-# from pathlib import Path
-# import subprocess
-
-# ROOT = Path(__file__).resolve().parents[2]
-# SCRIPT_MAP = {
-#     'ingestion': 'micro_data_preparation_yaml.py',
-#     'cleaning': 'transactions_data_main_parquet_yaml.py',
-#     'merging': 'transactions_data_preparation_mode_parquet_yaml.py',
-#     'modeling': 'regression_modeling_log_parquet_yaml_multi.py',
-#     'forecasting': 'forecasting_engine_chronos.py',
-#     'forecasting_news': 'forecasting_engine_chronos_news.py',
-# }
-
-# if __name__ == '__main__':
-#     stage = Path(__file__).resolve().parent.name
-#     subprocess.run(['python', str(ROOT / SCRIPT_MAP[stage])], check=True)
-
-
 import os
 from pathlib import Path
 import subprocess
 import yaml
 import mlflow
+import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Define root directory
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,27 +29,71 @@ def load_config():
             return yaml.safe_load(f)
     return {}
 
-if __name__ == '__main__':
-    # Automatically determine the stage based on the parent folder name
-    stage = Path(__file__).resolve().parent.name
+def execute_modeling_tracking(config):
+    """
+    Reads area-wise metrics, prints a formatted summary table to the terminal, 
+    and logs them to MLflow.
+    """
+    paths = config.get('paths', {})
+    metrics_file = paths.get('metrics_file') or paths.get('model_metrics_file') or "data/processed/model_metrics.csv"
     
+    metrics_path = ROOT / metrics_file if not Path(metrics_file).is_absolute() else Path(metrics_file)
+
+    if metrics_path.exists():
+        metrics_df = pd.read_csv(metrics_path)
+        
+        # Print a clean summary table to logs/terminal (notebook style)
+        print("\n" + "="*90)
+        print(" AREA-WISE MODELING METRICS SUMMARY TABLE ".center(90, "="))
+        print("="*90)
+        print(metrics_df.to_string(index=False))
+        print("="*90 + "\n")
+        
+        # Log area-wise breakdowns under nested MLflow runs
+        for _, row in metrics_df.iterrows():
+            area_name = row.get('area_name') or row.get('model_area_id') or 'global'
+            clean_area = str(area_name).replace(" ", "_").lower()
+            
+            with mlflow.start_run(run_name=f"model_{clean_area}", nested=True):
+                mlflow.set_tag("area_name", str(area_name))
+                for col in metrics_df.columns:
+                    if col not in ['area_name', 'model_area_id']:
+                        val = row[col]
+                        if pd.notna(val):
+                            if isinstance(val, (int, float)):
+                                mlflow.log_metric(f"{clean_area}_{col}", float(val))
+                            else:
+                                mlflow.log_param(f"{clean_area}_{col}", str(val))
+        
+        # Save metrics table as an MLflow artifact
+        mlflow.log_artifact(str(metrics_path), artifact_path="modeling_metrics")
+        logger.info("Area-wise modeling metrics table printed and logged successfully to MLflow.")
+    else:
+        logger.warning(f"Metrics file not found at {metrics_path}")
+
+if __name__ == '__main__':
+    stage = Path(__file__).resolve().parent.name
     if stage in SCRIPT_MAP:
         config = load_config()
         
-        # Setup MLflow Tracking using settings from config.yaml
+        # Setup MLflow Tracking
         mlflow_cfg = config.get('mlflow', {})
         if mlflow_cfg.get('tracking_uri'):
             mlflow.set_tracking_uri(mlflow_cfg['tracking_uri'])
-            mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
+        mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
         
-        # Execute the stage script inside an active MLflow run context
         script_path = ROOT / SCRIPT_MAP[stage]
-        
         with mlflow.start_run(run_name=f"stage_{stage}"):
             mlflow.log_param("stage", stage)
             print(f"--- Running stage: {stage} via {script_path.name} ---")
             
-            # Execute script
+            # Execute underlying multi-model regression script
             subprocess.run(['python', str(script_path)], check=True)
+            
+            # Print table and log to MLflow
+            try:
+                execute_modeling_tracking(config)
+            except Exception as e:
+                logger.error(f"Error logging modeling metadata to MLflow: {e}")
     else:
         print(f"Unknown stage directory: '{stage}'")

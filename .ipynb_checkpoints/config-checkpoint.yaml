@@ -2,8 +2,8 @@
 # INGESTION SETTINGS
 # ==============================================================================
 paths:
-  project_root: /home/ubuntu/Dubai/truestates-ml-ops4
-  base_dir: /home/ubuntu/Dubai/
+  project_root: /home/ubuntu/Dubai/truestates-ml-ops/
+  base_dir: /home/ubuntu/Dubai
   data_dir: /home/ubuntu/Dubai/data
   raw_dir: /home/ubuntu/Dubai/data/raw
   processed_dir: /home/ubuntu/Dubai/data/processed
@@ -11,7 +11,6 @@ paths:
   model_requirements_dir: /home/ubuntu/Dubai/data/model_requirements
   models_dir: /home/ubuntu/Dubai/data/model_requirements/models
   columns_dir: /home/ubuntu/Dubai/data/model_requirements/trained_columns
-
   projects_file: /home/ubuntu/Dubai/data/raw/projects.parquet
   developers_file: /home/ubuntu/Dubai/data/raw/developers.parquet
   buildings_file: /home/ubuntu/Dubai/data/raw/buildings.parquet
@@ -20,7 +19,6 @@ paths:
   project_grade: /home/ubuntu/Dubai/data/raw/project_scorecard.xlsx
   dev_grade: /home/ubuntu/Dubai/data/raw/developer_scorecard.xlsx
   bld_grade: /home/ubuntu/Dubai/data/raw/Dubai_RE_Classification_DLD.xlsx
-
   ingestion_output: /home/ubuntu/Dubai/data/processed/latest_pdbu_df.csv
   transactions_output: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
   merging_input_trans: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
@@ -48,10 +46,9 @@ paths:
   parameter_tuning_log: /home/ubuntu/Dubai/data/parameter_tuning_log.csv
 
 mlflow:
-  tracking_uri: http://51.38.112.237:5001
-  experiment_name: truestates-ml-ops
-
-
+  tracking_uri: "http://51.38.112.237:5001"
+  experiment_name: "truestates-ml-ops"
+  
 ingestion_columns:
   projects:
     - project_id
