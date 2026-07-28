@@ -6,6 +6,7 @@ from pathlib import Path
 import warnings
 import yaml
 import mlflow
+import os
 
 warnings.filterwarnings('ignore')
 ROOT = Path(__file__).resolve().parent
@@ -22,6 +23,13 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+
+# Set Cloudflare R2 Environment Variables for S3FS & Pandas
+os.environ["AWS_ENDPOINT_URL"] = "https://ef8eef61229ee8854b4237f6949e50d8.r2.cloudflarestorage.com/truestates-re-analytics"
+os.environ["AWS_ACCESS_KEY_ID"] = "c198c85bd01da0931eae24009fb2100b"
+os.environ["AWS_SECRET_ACCESS_KEY"] = "826187ffaee4742816f65ca4ebe149902db75ac52dbb81606bb34fe8bae4a57c"
 
 MODULE_MAP = {
     'Ingestion': {'module': 'micro_data_preparation_yaml', 'func': 'run_ingestion'},
@@ -77,8 +85,13 @@ def ensure_directories(config):
     for key in required:
         if key not in config['paths']:
             raise KeyError(f"Missing key in config.yaml: 'paths.{key}'")
-        Path(config['paths'][key]).mkdir(parents=True, exist_ok=True)
-
+        
+        path_str = config['paths'][key]
+        
+        # Only attempt to create local folders if path exists and is NOT an S3 URI
+        if path_str and not path_str.startswith("s3://"):
+            Path(path_str).mkdir(parents=True, exist_ok=True)
+            
 def run_full_dubai_pipeline(steps_to_run=None):
     config = load_config()
     ensure_directories(config)
@@ -88,7 +101,7 @@ def run_full_dubai_pipeline(steps_to_run=None):
         mlflow.set_tracking_uri(mlflow_cfg['tracking_uri'])
     mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
 
-    steps_to_run = steps_to_run or ['Ingestion', 'Cleaning', 'Merging', 'Modeling', 'Forecasting', 'Forecasting_news']
+    steps_to_run = steps_to_run or ['Ingestion', ] #' , 'Merging','Cleaning', 'Merging','Modeling','Forecasting','Forecasting_news'
     start = time.time()
     logger.info('=' * 60)
     logger.info('TRUESTATES ML OPS PIPELINE STARTING')

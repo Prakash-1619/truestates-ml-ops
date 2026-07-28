@@ -8,20 +8,38 @@ import torch
 import yfinance as yf
 from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from chronos import Chronos2Pipeline
+import s3fs
+import tempfile
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+def resolve_path(base, path_val):
+    return path_val if str(path_val).startswith("s3://") else os.path.join(base, path_val)
+    
 def ensure_old_dir(base_dir, config):
     folder = config.get('archive', {}).get('folder_name', 'old_files')
-    old_dir = os.path.join(base_dir, folder)
-    os.makedirs(old_dir, exist_ok=True)
+    old_dir = resolve_path(base_dir, folder)
+    
+    # Only make local directories, S3 doesn't need 'folders' created
+    if not str(old_dir).startswith("s3://"):
+        os.makedirs(old_dir, exist_ok=True)
     return old_dir
 
 def archive_existing_file(file_path, old_dir, prefix="old_"):
-    if os.path.exists(file_path):
-        archived_path = os.path.join(old_dir, f"{prefix}{os.path.basename(file_path)}")
-        shutil.move(file_path, archived_path)
+    is_s3 = str(file_path).startswith("s3://")
+    
+    if is_s3:
+        fs = s3fs.S3FileSystem()
+        if fs.exists(file_path):
+            # S3 uses forward slashes, not os.path.join
+            archived_path = f"{old_dir.rstrip('/')}/{prefix}{os.path.basename(file_path)}"
+            fs.move(file_path, archived_path)
+    else:
+        if os.path.exists(file_path):
+            archived_path = os.path.join(old_dir, f"{prefix}{os.path.basename(file_path)}")
+            shutil.move(file_path, archived_path)
 
 class DubaiPropertyForecaster:
     def __init__(self, model_name="amazon/chronos-2", prediction_length=6, backtest_periods=6, zero_threshold=0.90):
@@ -384,17 +402,30 @@ def run_entire_pipeline(trans_path, config_settings):
         backtest_metrics['area_name'] = backtest_metrics['model_area_id'].map(model_to_name)
 
     return backtest_metrics, future_mom_forecast, historical_df
-
+    
+def save_csv_safe(df, path):
+    import s3fs, tempfile, os
+    if str(path).startswith("s3://"):
+        fs = s3fs.S3FileSystem()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+            local_path = tmp.name
+        df.to_csv(local_path, index=False)
+        fs.put(local_path, path)
+        os.remove(local_path)
+    else:
+        df.to_csv(path, index=False)
 
 def execute_pipeline_entry(config):
     logger.info("Starting Forecasting Stage Orchestration...")
     base_dir = config['paths']['base_dir']
-    input_path = os.path.join(base_dir, config['paths']['chronos_input'])
-    output_path = os.path.join(base_dir, config['paths']['chronos_output'])
-    backtest_path = os.path.join(base_dir, config['paths']['chronos_backtest_output'])
-    historic_path = os.path.join(base_dir, config['paths']['chronos_historic_output'])
-    old_dir = os.path.join(base_dir, config['paths'].get('old_files_dir', 'old_files'))
-    os.makedirs(old_dir, exist_ok=True)
+    input_path = resolve_path(base_dir, config['paths']['chronos_input'])
+    output_path = resolve_path(base_dir, config['paths']['chronos_output'])
+    backtest_path = resolve_path(base_dir, config['paths']['chronos_backtest_output'])
+    historic_path = resolve_path(base_dir, config['paths']['chronos_historic_output'])
+    old_dir = resolve_path(base_dir, config['paths'].get('old_files_dir', 'old_files'))
+    
+    if not str(old_dir).startswith("s3://"):
+        os.makedirs(old_dir, exist_ok=True)
 
     forecast_settings = config.get('forecasting_settings', {})
     prefix = config.get('archive', {}).get('prefix', 'old_')
@@ -406,13 +437,13 @@ def execute_pipeline_entry(config):
     logger.info(f"Target Input File: {input_path}")
     backtest, forecast, historic = run_entire_pipeline(input_path, forecast_settings)
 
-    forecast.to_csv(output_path, index=False)
-    historic.to_csv(historic_path, index=False)
+    save_csv_safe(forecast, output_path)
+    save_csv_safe(historic, historic_path)
     logger.info(f"✅ Forecasting engine outputs successfully saved to: {output_path}")
     logger.info(f"✅ Historical timeline successfully saved to: {historic_path}")
-
+    
     if not backtest.empty:
-        backtest.to_csv(backtest_path, index=False)
+        save_csv_safe(backtest, backtest_path)
         logger.info(f"✅ Backtest metrics successfully saved to: {backtest_path}")
     else:
         logger.warning("⚠️ No backtest metrics were generated to save.")

@@ -3,51 +3,56 @@
 # ==============================================================================
 paths:
   project_root: /home/ubuntu/Dubai/truestates-ml-ops/
-  base_dir: /home/ubuntu/Dubai
-  data_dir: /home/ubuntu/Dubai/data
-  raw_dir: /home/ubuntu/Dubai/data/raw
-  processed_dir: /home/ubuntu/Dubai/data/processed
-  utils_dir: /home/ubuntu/Dubai/data/utils
-  model_requirements_dir: /home/ubuntu/Dubai/data/model_requirements
-  models_dir: /home/ubuntu/Dubai/data/model_requirements/models
-  columns_dir: /home/ubuntu/Dubai/data/model_requirements/trained_columns
-  projects_file: /home/ubuntu/Dubai/data/raw/projects.parquet
-  developers_file: /home/ubuntu/Dubai/data/raw/developers.parquet
-  buildings_file: /home/ubuntu/Dubai/data/raw/buildings.parquet
-  units_file: /home/ubuntu/Dubai/data/raw/units.parquet
-  transactions_input: /home/ubuntu/Dubai/data/raw/transactions.parquet
-  project_grade: /home/ubuntu/Dubai/data/raw/project_scorecard.xlsx
-  dev_grade: /home/ubuntu/Dubai/data/raw/developer_scorecard.xlsx
-  bld_grade: /home/ubuntu/Dubai/data/raw/Dubai_RE_Classification_DLD.xlsx
-  ingestion_output: /home/ubuntu/Dubai/data/processed/latest_pdbu_df.csv
-  transactions_output: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
-  merging_input_trans: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
-  merging_input_micro: /home/ubuntu/Dubai/data/processed/latest_pdbu_df.csv
-  merging_output: /home/ubuntu/Dubai/data/processed/latest_combined_data.parquet
-  outliers_metadata: /home/ubuntu/Dubai/data/processed/metadata_outliers_cleaning.csv
-  model_input: /home/ubuntu/Dubai/data/processed/latest_combined_data.parquet
-  metrics_file: /home/ubuntu/Dubai/data/processed/all_area_metrics.csv
-  ranges_file: /home/ubuntu/Dubai/data/model_requirements/input_ranges.csv
-  forecast_input: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
-  historic_output: /home/ubuntu/Dubai/data/processed/historic_df.csv
-  growth_output: /home/ubuntu/Dubai/data/processed/forecast_df.csv
-  forecast_metadata: /home/ubuntu/Dubai/data/processed/forecasting_metadata.csv
-  chronos_input: /home/ubuntu/Dubai/data/processed/unit_res_trans_16.parquet
-  chronos_output: /home/ubuntu/Dubai/data/model_requirements/final_chronos_forecasts.csv
-  chronos_backtest_output: /home/ubuntu/Dubai/data/processed/chronos_backtest_metrics.csv
-  chronos_historic_output: /home/ubuntu/Dubai/data/model_requirements/chronos_historical_baseline.csv
-  area_sens_path: /home/ubuntu/Dubai/data/utils/area_sensitivity.json
-  entity_tiers_path: /home/ubuntu/Dubai/data/utils/entity_tiers.json
-  event_scales_path: /home/ubuntu/Dubai/data/utils/event_scale_bins.json
-  event_to_channel_path: /home/ubuntu/Dubai/data/utils/event_to_channel.json
-  geo_relevance_path: /home/ubuntu/Dubai/data/utils/geo_relevance.json
-  adjusted_forecast_output: /home/ubuntu/Dubai/data/model_requirements/adjusted_macro_forecast.csv
-  news_context_file: /home/ubuntu/Dubai/data/utils/news_context.json
-  parameter_tuning_log: /home/ubuntu/Dubai/data/parameter_tuning_log.csv
+  base_dir: "s3://dubai"
+  data_dir: s3://dubai/data
+  raw_dir: s3://dubai/data/raw
+  processed_dir: s3://dubai/data/processed
+  utils_dir: s3://dubai/data/utils
+  model_requirements_dir: s3://dubai/data/model_requirements
+  models_dir: s3://dubai/data/model_requirements/models
+  columns_dir: s3://dubai/data/model_requirements/trained_columns
+  projects_file: s3://dubai/data/raw/projects.parquet
+  developers_file: s3://dubai/data/raw/developers.parquet
+  buildings_file: s3://dubai/data/raw/buildings.parquet
+  units_file: s3://dubai/data/raw/units.parquet
+  transactions_input: s3://dubai/data/raw/transactions.parquet
+  project_grade: s3://dubai/data/raw/project_scorecard.xlsx
+  dev_grade: s3://dubai/data/raw/developer_scorecard.xlsx
+  bld_grade: s3://dubai/data/raw/Dubai_RE_Classification_DLD.xlsx
+  ingestion_output: s3://dubai/data/processed/latest_pdbu_df.csv
+  transactions_output: s3://dubai/data/processed/unit_res_trans_16.parquet
+  merging_input_trans: s3://dubai/data/processed/unit_res_trans_16.parquet
+  merging_input_micro: s3://dubai/data/processed/latest_pdbu_df.csv
+  merging_output: s3://dubai/data/processed/latest_combined_data.parquet
+  outliers_metadata: s3://dubai/data/processed/metadata_outliers_cleaning.csv
+  model_input: s3://dubai/data/processed/latest_combined_data.parquet
+  metrics_file: s3://dubai/data/processed/all_area_metrics.csv
+  ranges_file: s3://dubai/data/model_requirements/input_ranges.csv
+  forecast_input: s3://dubai/data/processed/unit_res_trans_16.parquet
+  historic_output: s3://dubai/data/processed/historic_df.csv
+  growth_output: s3://dubai/data/processed/forecast_df.csv
+  forecast_metadata: s3://dubai/data/processed/forecasting_metadata.csv
+  chronos_input: s3://dubai/data/processed/unit_res_trans_16.parquet
+  chronos_output: s3://dubai/data/model_requirements/final_chronos_forecasts.csv
+  chronos_backtest_output: s3://dubai/data/processed/chronos_backtest_metrics.csv
+  chronos_historic_output: s3://dubai/data/model_requirements/chronos_historical_baseline.csv
+  area_sens_path: s3://dubai/data/utils/area_sensitivity.json
+  entity_tiers_path: s3://dubai/data/utils/entity_tiers.json
+  event_scales_path: s3://dubai/data/utils/event_scale_bins.json
+  event_to_channel_path: s3://dubai/data/utils/event_to_channel.json
+  geo_relevance_path: s3://dubai/data/utils/geo_relevance.json
+  adjusted_forecast_output: s3://dubai/data/model_requirements/adjusted_macro_forecast.csv
+  news_context_file: s3://dubai/data/utils/news_context.json
+  parameter_tuning_log: s3://dubai/data/parameter_tuning_log.csv
 
 mlflow:
   tracking_uri: "http://51.38.112.237:5001"
   experiment_name: "truestates-ml-ops"
+  
+cloud_storage:
+  aws_access_key_id: "c198c85bd01da0931eae24009fb2100b"
+  aws_secret_access_key: "826187ffaee4742816f65ca4ebe149902db75ac52dbb81606bb34fe8bae4a57c"
+  endpoint_url: "https://ef8eef61229ee8854b4237f6949e50d8.r2.cloudflarestorage.com/truestates-re-analytics"
   
 ingestion_columns:
   projects:
