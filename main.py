@@ -101,7 +101,7 @@ def run_full_dubai_pipeline(steps_to_run=None):
         mlflow.set_tracking_uri(mlflow_cfg['tracking_uri'])
     mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
 
-    steps_to_run = steps_to_run or ['Ingestion', ] #' , 'Merging','Cleaning', 'Merging','Modeling','Forecasting','Forecasting_news'
+    steps_to_run = steps_to_run or ['Modeling', ] #' 'Ingestion', 'Merging','Cleaning', 'Merging','Modeling','Forecasting','Forecasting_news'
     start = time.time()
     logger.info('=' * 60)
     logger.info('TRUESTATES ML OPS PIPELINE STARTING')
