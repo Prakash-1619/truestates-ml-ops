@@ -53,7 +53,7 @@ def read_dataframe(path_str, config=None):
             return pd.read_parquet(p)
     return None
 
-@@mlflow.trace(name="execute_ingestion_tracking")
+@mlflow.trace(name="execute_ingestion_tracking")
 def execute_ingestion_tracking(config):
     """
     Extracts ingestion metrics and metadata to align with Miro board structure:

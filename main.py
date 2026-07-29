@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(ROOT / 'pipeline_run.log', mode='w'),
+        logging.FileHandler(ROOT / 'pipeline_run.log', mode='w', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ],
 )
@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 os.environ["AWS_ENDPOINT_URL"] = "https://ef8eef61229ee8854b4237f6949e50d8.r2.cloudflarestorage.com/truestates-re-analytics"
 os.environ["AWS_ACCESS_KEY_ID"] = "c198c85bd01da0931eae24009fb2100b"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "826187ffaee4742816f65ca4ebe149902db75ac52dbb81606bb34fe8bae4a57c"
+os.environ["MLFLOW_S3_ENDPOINT_URL"] = "https://ef8eef61229ee8854b4237f6949e50d8.r2.cloudflarestorage.com"
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 MODULE_MAP = {
     'Ingestion': {'module': 'micro_data_preparation_yaml', 'func': 'run_ingestion'},
@@ -73,6 +75,15 @@ def execute_stage_tracking(step_name, config):
         elif step_name == 'Forecasting_news':
             from src.forecasting_news.run import execute_forecasting_news_tracking
             execute_forecasting_news_tracking(config)
+        elif step_name == 'Ingestion':
+            from src.ingestion.run import execute_ingestion_tracking
+            execute_ingestion_tracking(config)
+        elif step_name == 'Cleaning':
+            from src.cleaning.run import execute_cleaning_tracking
+            execute_cleaning_tracking(config)
+        elif step_name == 'Merging':
+            from src.merging.run import execute_merging_tracking
+            execute_merging_tracking(config)
         else:
             logger.info(f"No custom MLflow metrics tracking function defined for {step_name} yet.")
     except ImportError as e:
@@ -92,6 +103,14 @@ def ensure_directories(config):
         if path_str and not path_str.startswith("s3://"):
             Path(path_str).mkdir(parents=True, exist_ok=True)
             
+def safe_mlflow_call(func, *args, **kwargs):
+    """Wrapper that silently handles MLflow connection failures."""
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        logger.warning(f"MLflow call failed (server may be unreachable): {e}")
+        return None
+
 def run_full_dubai_pipeline(steps_to_run=None):
     config = load_config()
     ensure_directories(config)
@@ -99,31 +118,67 @@ def run_full_dubai_pipeline(steps_to_run=None):
     mlflow_cfg = config.get('mlflow', {})
     if mlflow_cfg.get('tracking_uri'):
         mlflow.set_tracking_uri(mlflow_cfg['tracking_uri'])
-    mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
+    
+    try:
+        mlflow.set_experiment(mlflow_cfg.get('experiment_name', 'truestates-ml-ops'))
+    except Exception as e:
+        logger.warning(f"Failed to set MLflow experiment: {e}")
 
-    steps_to_run = steps_to_run or ['Modeling', ] #' 'Ingestion', 'Merging','Cleaning', 'Merging','Modeling','Forecasting','Forecasting_news'
+    steps_to_run = steps_to_run or ['Modeling', 'Forecasting', 'Forecasting_news']
     start = time.time()
     logger.info('=' * 60)
     logger.info('TRUESTATES ML OPS PIPELINE STARTING')
     logger.info('=' * 60)
 
-    with mlflow.start_run(run_name="full_pipeline_run"):
+    # Try to start a parent MLflow run, but don't crash if server is down
+    parent_run = None
+    try:
+        parent_run = mlflow.start_run(run_name="full_pipeline_run")
+    except Exception as e:
+        logger.warning(f"Could not start MLflow parent run: {e}")
+
+    try:
         for idx, step_name in enumerate(steps_to_run, 1):
             step_start = time.time()
             logger.info('--- [STEP %s / %s]: %s ---', idx, len(steps_to_run), step_name)
             
-            with mlflow.start_run(run_name=f"stage_{step_name.lower()}", nested=True):
+            # Try to start a nested MLflow run for this stage
+            child_run = None
+            try:
+                child_run = mlflow.start_run(run_name=f"stage_{step_name.lower()}", nested=True)
                 mlflow.log_param("stage", step_name)
-                
+            except Exception as e:
+                logger.warning(f"Could not start MLflow nested run for {step_name}: {e}")
+
+            try:
                 # 1. Execute the heavy machine learning script
                 run_step(step_name, config)
                 
                 # 2. Execute the MLflow tracking helper to parse metrics and push artifacts
                 execute_stage_tracking(step_name, config)
+            except Exception as e:
+                logger.error(f"Stage {step_name} failed with error: {e}", exc_info=True)
+            
+            # End child run safely
+            if child_run:
+                try:
+                    mlflow.end_run()
+                except Exception as e:
+                    logger.warning(f"Could not end MLflow child run for {step_name}: {e}")
 
             logger.info('Completed %s in %.2f s', step_name, time.time() - step_start)
+
+        safe_mlflow_call(mlflow.log_param, "steps_executed", str(steps_to_run))
+        safe_mlflow_call(mlflow.log_metric, "total_pipeline_time_minutes", (time.time() - start) / 60)
+    finally:
+        # End parent run safely
+        if parent_run:
+            try:
+                mlflow.end_run()
+            except Exception as e:
+                logger.warning(f"Could not end MLflow parent run: {e}")
             
     logger.info('Pipeline complete in %.2f minutes', (time.time() - start) / 60)
 
 if __name__ == '__main__':
-    run_full_dubai_pipeline()
+    run_full_dubai_pipeline()

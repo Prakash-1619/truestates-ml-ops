@@ -40,10 +40,18 @@ def execute_cleaning_tracking(config):
     # Look for common path keys for cleaned data
     cleaned_file = paths.get('cleaned_transactions_file') or paths.get('main_transactions_cleaned') or "data/processed/cleaned_transactions.parquet"
     
-    cleaned_path = ROOT / cleaned_file if not Path(cleaned_file).is_absolute() else Path(cleaned_file)
+    if str(cleaned_file).startswith('s3://'):
+        import s3fs
+        fs = s3fs.S3FileSystem()
+        file_exists = fs.exists(cleaned_file)
+        read_path = cleaned_file
+    else:
+        cleaned_path = ROOT / cleaned_file if not Path(cleaned_file).is_absolute() else Path(cleaned_file)
+        file_exists = cleaned_path.exists()
+        read_path = cleaned_path
 
-    if cleaned_path.exists():
-        df = pd.read_parquet(cleaned_path)
+    if file_exists:
+        df = pd.read_parquet(read_path)
         
         mlflow.log_metric("cleaned_dataset_rows", len(df))
         mlflow.log_param("cleaned_dataset_columns", len(df.columns))
@@ -70,7 +78,9 @@ if __name__ == '__main__':
             logger.info(f"--- Running stage: {stage} via {script_path.name} ---")
             
             # Execute underlying cleaning script
-            subprocess.run(['python', str(script_path)], check=True)
+            env = os.environ.copy()
+            env["MLFLOW_RUN_ID"] = mlflow.active_run().info.run_id
+            subprocess.run(['python', str(script_path)], check=True, env=env)
             
             # Log custom cleaning metrics to MLflow
             try:

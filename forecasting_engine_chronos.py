@@ -10,6 +10,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolu
 from chronos import Chronos2Pipeline
 import s3fs
 import tempfile
+import mlflow
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -222,6 +223,15 @@ class DubaiPropertyForecaster:
         df_copy = df_copy.ffill()
 
         df_copy = self._add_proxy_groups(df_copy)
+
+        # Dynamic area selection: keep only individual areas with >= 6000 raw records
+        # (proxies and groups are always kept)
+        proxy_group_names = {'proxy1', 'proxy2', 'proxy3', 'grouped1', 'grouped2', 'grouped3'}
+        area_record_counts = df_copy['area_name_en'].value_counts()
+        valid_individual_areas = area_record_counts[area_record_counts >= 6000].index.tolist()
+        valid_areas_set = set(valid_individual_areas) | proxy_group_names
+        df_copy = df_copy[df_copy['area_name_en'].isin(valid_areas_set)].reset_index(drop=True)
+        logger.info(f"Dynamic area filter: kept {len(valid_individual_areas)} individual areas (>=6000 records) + {len(proxy_group_names)} proxy/group areas")
 
         logger.info("Running monthly group aggregations with full features footprint...")
         monthly_df = self._aggregate_safe(df_copy)
@@ -439,13 +449,24 @@ def execute_pipeline_entry(config):
 
     save_csv_safe(forecast, output_path)
     save_csv_safe(historic, historic_path)
-    logger.info(f"✅ Forecasting engine outputs successfully saved to: {output_path}")
-    logger.info(f"✅ Historical timeline successfully saved to: {historic_path}")
+    logger.info(f"[OK] Forecasting engine outputs successfully saved to: {output_path}")
+    logger.info(f"[OK] Historical timeline successfully saved to: {historic_path}")
     
     if not backtest.empty:
         save_csv_safe(backtest, backtest_path)
-        logger.info(f"✅ Backtest metrics successfully saved to: {backtest_path}")
+        logger.info(f"[OK] Backtest metrics successfully saved to: {backtest_path}")
     else:
-        logger.warning("⚠️ No backtest metrics were generated to save.")
+        logger.warning("[WARN] No backtest metrics were generated to save.")
+
+    # Log forecasting metrics to MLflow
+    try:
+        mlflow.log_metric("forecast_areas_count", len(forecast['model_area_id'].unique()))
+        mlflow.log_metric("forecast_total_rows", len(forecast))
+        mlflow.log_metric("forecast_prediction_months", forecast_settings.get('prediction_points', 6))
+        if not backtest.empty:
+            mlflow.log_metric("backtest_avg_mape", float(backtest['MAPE'].mean()))
+            mlflow.log_metric("backtest_avg_mae", float(backtest['MAE'].mean()))
+    except Exception as e:
+        logger.warning(f"MLflow forecasting logging failed: {e}")
 
     return backtest, forecast, historic

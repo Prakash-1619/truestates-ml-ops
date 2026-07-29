@@ -12,6 +12,7 @@ import catboost as cb
 import warnings
 import s3fs
 import tempfile
+import mlflow
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import TransformedTargetRegressor
@@ -41,10 +42,8 @@ def archive_existing_file(file_path, old_dir, prefix="old_"):
         archived_path = os.path.join(old_dir, f"{prefix}{os.path.basename(file_path)}")
         shutil.move(file_path, archived_path)
 
-def load_config(config_path="config.yaml"):
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-        
+def _resolve_model_paths(config):
+    """Compute derived paths (input_full, m_dir, etc.) from base config."""
     base = config['paths'].get('base_dir', '')
 
     def safe_s3_join(b, p):
@@ -66,6 +65,11 @@ def load_config(config_path="config.yaml"):
             
     return config
 
+def load_config(config_path="config.yaml"):
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    return _resolve_model_paths(config)
+
 def train_and_save(name, area_df, target, config, cat_cols, num_cols, date_col='instance_date'):
     if date_col in area_df.columns:
         max_date = area_df[date_col].max()
@@ -76,7 +80,7 @@ def train_and_save(name, area_df, target, config, cat_cols, num_cols, date_col='
             train_df = pd.DataFrame()
 
     if test_df.empty or train_df.empty:
-        logger.warning(f"⚠️ Not enough data for Train/Test split for {name} (Requires historical data). Skipping...")
+        logger.warning(f"[WARN] Not enough data for Train/Test split for {name} (Requires historical data). Skipping...")
         return {}, {}, []
 
     combined_df = pd.concat([train_df, test_df])
@@ -231,42 +235,59 @@ def train_and_save(name, area_df, target, config, cat_cols, num_cols, date_col='
 
         final_cols = list(X_train_raw.columns) if best_area_metrics['best_algorithm'] == 'CatBoost' else list(X_train_enc.columns)
 
-    # S3-SAFE JOBLIB DUMP (Cloudflare R2 Method)
-    if str(model_filepath).startswith("s3://"):
-        fs = s3fs.S3FileSystem()
-        
-        # 1. Save MODEL locally first, then upload cleanly
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".joblib") as tmp_model:
-            local_model_path = tmp_model.name
-        joblib.dump(best_area_model, local_model_path)
-        fs.put(local_model_path, model_filepath)
-        os.remove(local_model_path)
-        
-        # 2. Save COLUMNS locally first, then upload cleanly
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".joblib") as tmp_cols:
-            local_cols_path = tmp_cols.name
-        joblib.dump(final_cols, local_cols_path)
-        fs.put(local_cols_path, cols_filepath)
-        os.remove(local_cols_path)
-            
-    else:
-        # Fallback for local testing
-        joblib.dump(best_area_model, model_filepath)
-        joblib.dump(final_cols, cols_filepath)
+        # --- MLflow Logging ---
+        try:
+            mlflow.log_param(f"area_{clean_n}_algorithm", best_area_metrics['best_algorithm'])
+            mlflow.log_param(f"area_{clean_n}_best_params", str(best_area_metrics.get('best_params', ''))[:250])
+            mlflow.log_metric(f"area_{clean_n}_test_r2", float(best_area_metrics.get('test_r2', 0)))
+            mlflow.log_metric(f"area_{clean_n}_test_mape", float(best_area_metrics.get('test_mape', 0)))
+            mlflow.log_metric(f"area_{clean_n}_test_mae", float(best_area_metrics.get('test_mae', 0)))
+            mlflow.log_metric(f"area_{clean_n}_test_rmse", float(best_area_metrics.get('test_rmse', 0)))
+            mlflow.log_metric(f"area_{clean_n}_train_r2", float(best_area_metrics.get('train_r2', 0)))
+            mlflow.log_metric(f"area_{clean_n}_train_samples", float(best_area_metrics.get('train_samples', 0)))
+            mlflow.log_metric(f"area_{clean_n}_test_samples", float(best_area_metrics.get('test_samples', 0)))
+        except Exception as e:
+            logger.warning(f"MLflow logging failed for area {name}: {e}")
+
+        # S3-SAFE JOBLIB DUMP (Cloudflare R2 Method)
+        if str(model_filepath).startswith("s3://"):
+            try:
+                fs = s3fs.S3FileSystem()
+                
+                # 1. Save MODEL locally first, then upload cleanly
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".joblib") as tmp_model:
+                    local_model_path = tmp_model.name
+                joblib.dump(best_area_model, local_model_path)
+                fs.put(local_model_path, model_filepath)
+                os.remove(local_model_path)
+                
+                # 2. Save COLUMNS locally first, then upload cleanly
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".joblib") as tmp_cols:
+                    local_cols_path = tmp_cols.name
+                joblib.dump(final_cols, local_cols_path)
+                fs.put(local_cols_path, cols_filepath)
+                os.remove(local_cols_path)
+            except Exception as e:
+                logger.error(f"S3 upload failed for {name}: {e}. Model trained but not saved to S3.")
+                
+        else:
+            # Fallback for local testing
+            joblib.dump(best_area_model, model_filepath)
+            joblib.dump(final_cols, cols_filepath)
     return best_area_metrics, best_area_model, param_logs
 
-def run_model_training():
-    config = load_config()
-    logger.info("🚀 Starting ML Training Pipeline...")
+def run_model_training(config=None):
+    config = _resolve_model_paths(config or load_config())
+    logger.info(">> Starting ML Training Pipeline...")
 
     cat_cols = config.get('training_columns', {}).get('cat_cols', [])
     num_cols = config.get('training_columns', {}).get('num_cols', [])
 
     if not cat_cols and not num_cols:
-        logger.error("❌ 'training_columns' not found in config.yaml! Please add them.")
+        logger.error("[ERROR] 'training_columns' not found in config.yaml! Please add them.")
         return
 
-    logger.info(f"🔍 Base Features Loaded: {len(cat_cols)} Categorical, {len(num_cols)} Numerical")
+    logger.info(f"[INFO] Base Features Loaded: {len(cat_cols)} Categorical, {len(num_cols)} Numerical")
     logger.info("=======================================================================================")
 
     df_raw = pd.read_parquet(config['paths']['input_full'])
@@ -275,11 +296,11 @@ def run_model_training():
     if trans_filters and 'trans_group_en' in df_raw.columns:
         before_len = len(df_raw)
         df_raw = df_raw[df_raw['trans_group_en'].isin(trans_filters)]
-        logger.info(f"🔄 Filtered trans_group_en for {trans_filters}. Kept {len(df_raw)} / {before_len} records.")
+        logger.info(f"[FILTER] Filtered trans_group_en for {trans_filters}. Kept {len(df_raw)} / {before_len} records.")
 
     target_col = config.get('training_logic', {}).get('target_col', 'meter_sale_price')
     if target_col not in df_raw.columns:
-        logger.warning(f"⚠️ Target '{target_col}' not found. Defaulting to 'actual_price'.")
+        logger.warning(f"[WARN] Target '{target_col}' not found. Defaulting to 'actual_price'.")
         target_col = 'actual_price' if 'actual_price' in df_raw.columns else 'transaction_value'
     df_raw = df_raw.dropna(subset=[target_col])
 
@@ -294,9 +315,9 @@ def run_model_training():
                 start_date = pd.to_datetime(start_date_str)
                 before_len = len(df_raw)
                 df_raw = df_raw[df_raw[date_col] >= start_date]
-                logger.info(f"📅 Filtered records strictly from {start_date_str} onwards. Kept {len(df_raw)} / {before_len} records.")
+                logger.info(f"[DATE] Filtered records strictly from {start_date_str} onwards. Kept {len(df_raw)} / {before_len} records.")
             except Exception as e:
-                logger.error(f"❌ Invalid 'start_date' format in config: {start_date_str}. Error: {e}")
+                logger.error(f"[ERROR] Invalid 'start_date' format in config: {start_date_str}. Error: {e}")
 
     market_mappings = config.get('market_mappings', {})
     mapping_groups = market_mappings.get('groups', {})
@@ -309,7 +330,7 @@ def run_model_training():
 
     best_results, summaries, all_param_logs = [], [], []
 
-    logger.info(f"--- 🚀 Starting Individual Area Models ({len(individual_areas_to_run)} total) ---")
+    logger.info(f"--- >> Starting Individual Area Models ({len(individual_areas_to_run)} total) ---")
     for area in individual_areas_to_run:
         area_df = df_raw[df_raw['area_name_en'] == area]
 
@@ -322,11 +343,11 @@ def run_model_training():
 
                 disp_name = (area[:18] + '..') if len(area) > 20 else area
                 shape_str = str(metrics.get('train_shape', 'N/A'))
-                logger.info(f"🏆 {disp_name:20} | Shape: {shape_str:10} | Algo: {metrics.get('best_algorithm', 'N/A'):10} | R2: {metrics.get('test_r2', 0):5.2f} | MAPE: {metrics.get('test_mape', 0):6.2%} | MAE: {metrics.get('test_mae', 0):,.0f} | RMSE: {metrics.get('test_rmse', 0):,.0f}")
+                logger.info(f"[BEST] {disp_name:20} | Shape: {shape_str:10} | Algo: {metrics.get('best_algorithm', 'N/A'):10} | R2: {metrics.get('test_r2', 0):5.2f} | MAPE: {metrics.get('test_mape', 0):6.2%} | MAE: {metrics.get('test_mae', 0):,.0f} | RMSE: {metrics.get('test_rmse', 0):,.0f}")
         else:
-            logger.warning(f"⚠️ Skipped {area}: Insufficient train data ({len(area_df)} rows)")
+            logger.warning(f"[WARN] Skipped {area}: Insufficient train data ({len(area_df)} rows)")
 
-    logger.info(f"--- 🚀 Starting Combined Models ({len(combined_mappings)} total) ---")
+    logger.info(f"--- >> Starting Combined Models ({len(combined_mappings)} total) ---")
     for combined_name, combined_area_list in combined_mappings.items():
         area_df = df_raw[df_raw['area_name_en'].isin(combined_area_list)]
 
@@ -338,9 +359,9 @@ def run_model_training():
                 all_param_logs.extend(params)
 
                 shape_str = str(metrics.get('train_shape', 'N/A'))
-                logger.info(f"🏆 {combined_name:20} | Shape: {shape_str:10} | Algo: {metrics.get('best_algorithm', 'N/A'):10} | R2: {metrics.get('test_r2', 0):5.2f} | MAPE: {metrics.get('test_mape', 0):6.2%} | MAE: {metrics.get('test_mae', 0):,.0f} | RMSE: {metrics.get('test_rmse', 0):,.0f}")
+                logger.info(f"[BEST] {combined_name:20} | Shape: {shape_str:10} | Algo: {metrics.get('best_algorithm', 'N/A'):10} | R2: {metrics.get('test_r2', 0):5.2f} | MAPE: {metrics.get('test_mape', 0):6.2%} | MAE: {metrics.get('test_mae', 0):,.0f} | RMSE: {metrics.get('test_rmse', 0):,.0f}")
         else:
-            logger.warning(f"⚠️ Skipped {combined_name}: Insufficient train data ({len(area_df)} rows)")
+            logger.warning(f"[WARN] Skipped {combined_name}: Insufficient train data ({len(area_df)} rows)")
 
     base = config['paths']['base_dir']
     metrics_path = config['paths'].get('metrics_path') or os.path.join(base, config['paths'].get('metrics_file', 'best_model_metrics.csv'))
@@ -358,9 +379,18 @@ def run_model_training():
         pd.DataFrame(best_results).to_csv(metrics_path, index=False)
         pd.DataFrame(summaries).to_csv(ranges_path, index=False)
         pd.DataFrame(all_param_logs).to_csv(params_path, index=False)
-        logger.info("🎉 Training Complete. All metrics and tuning logs saved to base directory.")
+
+        # Log metrics CSV as MLflow artifact
+        try:
+            mlflow.log_metric("total_areas_trained", len(best_results))
+            mlflow.log_metric("avg_test_r2", float(pd.DataFrame(best_results)['test_r2'].mean()))
+            mlflow.log_metric("avg_test_mape", float(pd.DataFrame(best_results)['test_mape'].mean()))
+        except Exception as e:
+            logger.warning(f"MLflow summary logging failed: {e}")
+
+        logger.info("[DONE] Training Complete. All metrics and tuning logs saved to base directory.")
     else:
-        logger.error("❌ No models were successfully trained.")
+        logger.error("[ERROR] No models were successfully trained.")
 
 if __name__ == "__main__":
     run_model_training()

@@ -19,4 +19,6 @@ def setup_mlflow(config=None, config_path='config.yaml'):
 
 def ensure_project_dirs(config):
     for key in ['data_dir', 'raw_dir', 'processed_dir', 'utils_dir', 'model_requirements_dir', 'models_dir', 'columns_dir']:
-        Path(config['paths'][key]).mkdir(parents=True, exist_ok=True)
+        path_str = config['paths'].get(key, '')
+        if path_str and not str(path_str).startswith('s3://'):
+            Path(path_str).mkdir(parents=True, exist_ok=True)

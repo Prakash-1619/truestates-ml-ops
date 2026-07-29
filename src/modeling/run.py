@@ -37,10 +37,18 @@ def execute_modeling_tracking(config):
     paths = config.get('paths', {})
     metrics_file = paths.get('metrics_file') or paths.get('model_metrics_file') or "data/processed/model_metrics.csv"
     
-    metrics_path = ROOT / metrics_file if not Path(metrics_file).is_absolute() else Path(metrics_file)
+    if str(metrics_file).startswith('s3://'):
+        import s3fs
+        fs = s3fs.S3FileSystem()
+        file_exists = fs.exists(metrics_file)
+        read_path = metrics_file
+    else:
+        metrics_path = ROOT / metrics_file if not Path(metrics_file).is_absolute() else Path(metrics_file)
+        file_exists = metrics_path.exists()
+        read_path = metrics_path
 
-    if metrics_path.exists():
-        metrics_df = pd.read_csv(metrics_path)
+    if file_exists:
+        metrics_df = pd.read_csv(read_path)
         
         # Print a clean summary table to logs/terminal (notebook style)
         print("\n" + "="*90)
@@ -66,7 +74,8 @@ def execute_modeling_tracking(config):
                                 mlflow.log_param(f"{clean_area}_{col}", str(val))
         
         # Save metrics table as an MLflow artifact
-        mlflow.log_artifact(str(metrics_path), artifact_path="modeling_metrics")
+        if not str(read_path).startswith('s3://'):
+            mlflow.log_artifact(str(read_path), artifact_path="modeling_metrics")
         logger.info("Area-wise modeling metrics table printed and logged successfully to MLflow.")
     else:
         logger.warning(f"Metrics file not found at {metrics_path}")
@@ -88,7 +97,9 @@ if __name__ == '__main__':
             print(f"--- Running stage: {stage} via {script_path.name} ---")
             
             # Execute underlying multi-model regression script
-            subprocess.run(['python', str(script_path)], check=True)
+            env = os.environ.copy()
+            env["MLFLOW_RUN_ID"] = mlflow.active_run().info.run_id
+            subprocess.run(['python', str(script_path)], check=True, env=env)
             
             # Print table and log to MLflow
             try:

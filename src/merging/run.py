@@ -38,10 +38,18 @@ def execute_merging_tracking(config):
     paths = config.get('paths', {})
     merged_file = paths.get('merged_file') or paths.get('combined_transactions_file') or "data/processed/transactions_merged.parquet"
     
-    merged_path = ROOT / merged_file if not Path(merged_file).is_absolute() else Path(merged_file)
+    if str(merged_file).startswith('s3://'):
+        import s3fs
+        fs = s3fs.S3FileSystem()
+        file_exists = fs.exists(merged_file)
+        read_path = merged_file
+    else:
+        merged_path = ROOT / merged_file if not Path(merged_file).is_absolute() else Path(merged_file)
+        file_exists = merged_path.exists()
+        read_path = merged_path
 
-    if merged_path.exists():
-        df = pd.read_parquet(merged_path)
+    if file_exists:
+        df = pd.read_parquet(read_path)
         
         # Dynamically identify month, area, and value columns
         month_col = next((col for col in df.columns if 'month' in col.lower() or 'date' in col.lower()), None)
@@ -89,7 +97,9 @@ if __name__ == '__main__':
             logger.info(f"--- Running stage: {stage} via {script_path.name} ---")
             
             # Execute underlying merging script
-            subprocess.run(['python', str(script_path)], check=True)
+            env = os.environ.copy()
+            env["MLFLOW_RUN_ID"] = mlflow.active_run().info.run_id
+            subprocess.run(['python', str(script_path)], check=True, env=env)
             
             # Log market snapshot metrics to MLflow
             try:

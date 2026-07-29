@@ -9,6 +9,7 @@ import json
 import logging
 from tqdm import tqdm
 import yaml
+import mlflow
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -590,7 +591,6 @@ class DecayModeler:
             t = (month_dt.year - event_date.year) * 12 + (month_dt.month - event_date.month)
 
             v0 = v0_lookup.get(row["area_id"], 0)
-            print(v0)
 
             if t < 0:
                 return row["predictions"], row.get("macro_news_factor", 0), 1.0, 0.0
@@ -598,7 +598,6 @@ class DecayModeler:
             sentiment_decay, price_impact_norm, params = cls.dubai_re_decay_dynamic(t, dominant_event)
 
             current_news_factor = v0 * sentiment_decay
-            print(current_news_factor)
 
             if abs(v0) > 0.0001:
                 structural_impact = price_impact_norm * params["p_sensitivity"] * abs(params["direction"])
@@ -987,6 +986,14 @@ def execute_pipeline_entry(config=None):
         final_df.to_csv(output_file, index=False) # <-- Changed here!
 
     logger.info(f"Adjusted macro forecast saved to: {output_file}")
+
+    # Log forecasting news metrics to MLflow
+    try:
+        mlflow.log_metric("adjusted_forecast_rows", len(final_df) if final_df is not None else 0)
+        mlflow.log_param("llm_model", config.get('macro_news_settings', {}).get('llm_model', 'unknown') if config is not None else MODEL)
+    except Exception as e:
+        logger.warning(f"MLflow forecasting news logging failed: {e}")
+
     return final_df
 
 

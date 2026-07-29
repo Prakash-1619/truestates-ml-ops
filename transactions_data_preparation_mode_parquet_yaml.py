@@ -116,7 +116,8 @@ def process_and_merge_transactions(trans_path, micro_path, output_path, proj_gra
 
     # 3. Apply Outlier Treatments
     final_out_dir = os.path.dirname(output_path)
-    os.makedirs(final_out_dir, exist_ok=True) 
+    if not str(final_out_dir).startswith("s3://"):
+        os.makedirs(final_out_dir, exist_ok=True) 
     df = apply_all_outlier_treatments(df, output_dir=final_out_dir)
 
     # 4. Generate trans_ubp_key

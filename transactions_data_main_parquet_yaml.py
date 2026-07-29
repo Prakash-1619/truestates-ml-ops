@@ -15,9 +15,7 @@ def load_config(config_path="config.yaml"):
         config = yaml.safe_load(f)
         
     # Resolve absolute paths from the compiled config structure
-    # base = config['paths']['base_dir']
-    # config['paths']['trans_in'] = os.path.join(base, config['paths']['transactions_input'])
-    # config['paths']['trans_out'] = os.path.join(base, config['paths']['transactions_output'])
+    base = config['paths']['base_dir']
     # SAFE S3 PATH RESOLUTION
     trans_in = config['paths']['transactions_input']
     trans_out = config['paths']['transactions_output']

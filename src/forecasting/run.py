@@ -37,10 +37,18 @@ def execute_forecasting_tracking(config):
     paths = config.get('paths', {})
     forecast_file = paths.get('forecast_file') or paths.get('chronos_forecast_file') or "data/processed/forecast_df.csv"
     
-    forecast_path = ROOT / forecast_file if not Path(forecast_file).is_absolute() else Path(forecast_file)
+    if str(forecast_file).startswith('s3://'):
+        import s3fs
+        fs = s3fs.S3FileSystem()
+        file_exists = fs.exists(forecast_file)
+        read_path = forecast_file
+    else:
+        forecast_path = ROOT / forecast_file if not Path(forecast_file).is_absolute() else Path(forecast_file)
+        file_exists = forecast_path.exists()
+        read_path = forecast_path
 
-    if forecast_path.exists():
-        forecast_df = pd.read_parquet(forecast_path) if forecast_path.suffix == '.parquet' else pd.read_csv(forecast_path)
+    if file_exists:
+        forecast_df = pd.read_csv(read_path) if str(read_path).endswith('.csv') else pd.read_parquet(read_path)
         
         # Print preview table of projections to logs/terminal
         print("\n" + "="*90)
@@ -51,7 +59,8 @@ def execute_forecasting_tracking(config):
         
         # Log metrics and artifacts
         mlflow.log_metric("forecast_total_rows", len(forecast_df))
-        mlflow.log_artifact(str(forecast_path), artifact_path="forecast_outputs")
+        if not str(read_path).startswith('s3://'):
+            mlflow.log_artifact(str(read_path), artifact_path="forecast_outputs")
         logger.info("Forecasting stage outputs logged successfully to MLflow.")
     else:
         logger.warning(f"Forecast output file not found at {forecast_path}")
@@ -73,7 +82,9 @@ if __name__ == '__main__':
             print(f"--- Running stage: {stage} via {script_path.name} ---")
             
             # Execute underlying forecasting script
-            subprocess.run(['python', str(script_path)], check=True)
+            env = os.environ.copy()
+            env["MLFLOW_RUN_ID"] = mlflow.active_run().info.run_id
+            subprocess.run(['python', str(script_path)], check=True, env=env)
             
             # Track forecasting artifacts in MLflow
             try:

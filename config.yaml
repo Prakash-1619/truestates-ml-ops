@@ -155,24 +155,11 @@ merging_params:
 # ==============================================================================
 # REGRESSION MODEL SETTINGS
 # ==============================================================================
-# =======
-transaction_settings:
-  start_filter_date: '2010-01-01'
-  exclude_group: ['Gifts', 'Mortgages']
-  property_usage: Residential
-  property_type: Unit
-  date_format: '%d-%m-%Y'
-
-merging_params:
-  exclude_rooms: ['Office', 'Shop', 'Single Room', '0', 'No_rooms_en', 'Missing_rooms_en']
-
-# >>>>>>> 5e3dcd2 (Initial project structure with local storage and MLflow)
 model_params:
   n_estimators: 300
   random_state: 42
   n_jobs: -1
   test_size: 0.2
-# <<<<<<< HEAD
 
 training_columns:
   cat_cols:
