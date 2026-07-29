@@ -351,7 +351,7 @@ class EventProcessor:
         if df.empty:
             return pd.DataFrame()
 
-        for i, row in tqdm(df[:10].iterrows(), total=len(df[:10]), desc="Extracting Events"):
+        for i, row in tqdm(df.iterrows(), total=len(df), desc="Extracting Events"):
             prompt = USER_PROMPT_TEMPLATE.format(
                 title=row.get("title", ""),
                 published_date=row.get("published_date", ""),
