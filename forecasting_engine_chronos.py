@@ -36,7 +36,13 @@ def archive_existing_file(file_path, old_dir, prefix="old_"):
         if fs.exists(file_path):
             # S3 uses forward slashes, not os.path.join
             archived_path = f"{old_dir.rstrip('/')}/{prefix}{os.path.basename(file_path)}"
-            fs.move(file_path, archived_path)
+            # fs.move(file_path, archived_path)
+            try:
+                # Use copy instead of move so it doesn't require delete permissions
+                fs.copy(file_path, archived_path)
+            except Exception as e:
+                print(f"Archival copy skipped: {e}")
+
     else:
         if os.path.exists(file_path):
             archived_path = os.path.join(old_dir, f"{prefix}{os.path.basename(file_path)}")
