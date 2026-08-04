@@ -917,7 +917,7 @@ async def unified_forecast(
         if not res_df.empty:
             res_df = res_df.copy()
             res_df["month"] = pd.to_datetime(res_df["month"], errors="coerce") + MonthEnd(0)
-            res_df = res_df.sort_values("month")
+            res_df = res_df.sort_values("month").drop_duplicates(subset=["month"], keep="last")
             exact_match = res_df[(res_df["month"] == pivot_dt) & (res_df["median_price"].notna())]
             if not exact_match.empty:
                 model_point_df = exact_match.copy()
@@ -955,14 +955,14 @@ async def unified_forecast(
         if not res_df.empty:
             res_df = res_df.copy()
             res_df["month"] = pd.to_datetime(res_df["month"], errors="coerce") + MonthEnd(0)
-            res_df = res_df.sort_values("month").reset_index(drop=True)
+            res_df = res_df.sort_values("month").drop_duplicates(subset=["month"], keep="last").reset_index(drop=True)
             
         area_news = pd.DataFrame()
         news_available = False
         if not news_df.empty and "area" in news_df.columns:
-            area_news = news_df[news_df["area"].astype(str).str.strip() == resolved_area].copy()
+            area_news = news_df[news_df["area"].astype(str).str.strip().str.lower() == str(resolved_area).lower()].copy()
             if area_news.empty and lookup_area != resolved_area:
-                area_news = news_df[news_df["area"].astype(str).str.strip() == lookup_area].copy()
+                area_news = news_df[news_df["area"].astype(str).str.strip().str.lower() == str(lookup_area).lower()].copy()
             
             if not area_news.empty:
                 news_available = True
