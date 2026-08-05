@@ -934,6 +934,22 @@ def run_market_forecasting_pipeline(chronos_df: pd.DataFrame, area_to_id: dict) 
 def execute_pipeline_entry(config=None):
     global app_config, macro_news_settings, paths_config, OLLAMA_URL, MODEL, PROJECTION_MONTHS_AHEAD
 
+    # Load credentials from config.yaml if present
+    try:
+        import yaml, os
+        with open("config.yaml", "r") as f:
+            cfg = yaml.safe_load(f)
+        storage = cfg.get("cloud_storage", {})
+        if "endpoint_url" in storage:
+            os.environ["AWS_ENDPOINT_URL_S3"] = storage["endpoint_url"]
+            os.environ["AWS_ENDPOINT_URL"] = storage["endpoint_url"]  # for pandas/s3fs
+        if "aws_access_key_id" in storage:
+            os.environ["AWS_ACCESS_KEY_ID"] = storage["aws_access_key_id"]
+        if "aws_secret_access_key" in storage:
+            os.environ["AWS_SECRET_ACCESS_KEY"] = storage["aws_secret_access_key"]
+    except Exception as e:
+        logger.warning(f"Could not load cloud_storage from config.yaml: {e}")
+
     if config is not None:
         app_config = config
         macro_news_settings = app_config.get("macro_news_settings", {})
